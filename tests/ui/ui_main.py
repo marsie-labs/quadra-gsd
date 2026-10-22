@@ -2,8 +2,8 @@
 
 from nicegui import ui
 
-from app.ui import canvas_page
+from app.ui.pages import register_pages
 
-canvas_page.register()
+register_pages()
 
 ui.run(storage_secret="test-storage-secret-for-the-nicegui-user-fixture")

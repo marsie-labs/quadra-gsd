@@ -57,9 +57,11 @@ async def test_create_from_home_lands_on_canvas(
     user.find("Project name").type(name)
     user.find("Create").click()
 
-    await user.should_see(name)
+    # The Project name input still holds `name` on the home page, so waiting on the text alone
+    # would pass before navigation. Wait for the canvas markers, which only exist on /s/{token}.
+    await user.should_see(marker="project-name", content=name, retries=50)
     for kind, label in LABELS.items():
-        user.find(marker=f"quadrant-{kind}")
+        await user.should_see(marker=f"quadrant-{kind}")
         await user.should_see(label)
 
     resp = await (
