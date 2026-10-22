@@ -7,7 +7,7 @@
 
 A teammate creates a session from the home page and lands on its unguessable `/s/{session_id}` link, which renders the project name and the four quadrants from hosted Supabase. The single-worker server proves at startup that database change events reach it through Supabase Realtime.
 
-The tracer that proves it is 01-02 (home form → SessionService → Repository → `create_session` RPC → read-back → canvas). Plans 01-03, 01-04 and 01-05 expand from that slice.
+The tracer that proves it is 01-02 (home form → SessionService → Repository → `create_session` RPC → read-back → canvas). Plans 01-03 to 01-06 expand from that slice.
 
 ## Architectural Decisions
 
@@ -30,10 +30,10 @@ The tracer that proves it is 01-02 (home form → SessionService → Repository 
 ## Stack Touched in Phase 1
 
 - [x] Project scaffold (framework, build, lint, test runner): 01-01
-- [x] Routing, at least one real route: `/`, `/s/{session_id}` (01-02), `/healthz` (01-04)
+- [x] Routing, at least one real route: `/`, `/s/{session_id}` (01-02), `/healthz` (01-05)
 - [x] Database, at least one real read AND one real write: `create_session` RPC write + embedded `workspaces → quadrants` read (01-02); probe upsert (01-04)
-- [x] UI, at least one interactive element wired to the API: home "Create" form → SessionService → RPC → navigate (01-02); name banner and authoring gate (01-05)
-- [x] Deployment, a documented local full-stack run command: `uv run python -m app` + README (01-04)
+- [x] UI, at least one interactive element wired to the API: home "Create" form → SessionService → RPC → navigate (01-02); name banner and authoring gate (01-06)
+- [x] Deployment, a documented local full-stack run command: `uv run python -m app` + README (01-05)
 
 ## Out of Scope (Deferred to Later Slices)
 
