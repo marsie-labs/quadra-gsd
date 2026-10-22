@@ -1,4 +1,4 @@
-"""Display-name rules (D-03, D-04): trim, 1-40 code points, fixed once stored, duplicates allowed."""
+"""Display-name rules (D-03, D-04): trim, 1-40 code points, fixed once stored, dupes ok."""
 
 import pytest
 

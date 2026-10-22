@@ -4,6 +4,7 @@ from nicegui import ui
 
 from app.deps import get_services
 from app.models import QUADRANT_LABELS
+from app.ui.identity import current_name, name_banner
 
 
 def register() -> None:
@@ -19,6 +20,15 @@ def register() -> None:
 
         with ui.row().classes("items-center"):
             ui.label(view.project_name).classes("text-h5").mark("project-name")
+            # Read-only text (D-03): no input and no rename control. Empty when unnamed.
+            header_name = ui.label(current_name() or "").classes("text-grey").mark("display-name")
+
+        def on_name_saved(name: str) -> None:
+            header_name.text = name
+
+        if current_name() is None:
+            # Inline and ignorable, never a blocking modal (D-01).
+            name_banner(on_saved=on_name_saved)
         with ui.grid().classes("grid-cols-1 md:grid-cols-2 gap-4 w-full"):
             for q in sorted(view.quadrants, key=lambda q: q.position):
                 with ui.card().mark(f"quadrant-{q.kind}"):
