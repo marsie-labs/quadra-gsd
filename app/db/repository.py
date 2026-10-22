@@ -1,5 +1,6 @@
 """The only module that talks PostgREST. Uses the async Supabase client exclusively."""
 
+from datetime import UTC, datetime
 from typing import Any
 
 from app.settings import Settings
@@ -38,3 +39,15 @@ class Repository:
         if resp is None:
             return None
         return resp.data
+
+    async def upsert_probe(self, nonce: str) -> None:
+        """Write the realtime_probe row (id=1) carrying ``nonce``.
+
+        The first call produces an INSERT event and later ones UPDATE events. The Realtime
+        startup check waits for the event that carries the nonce.
+        """
+        await (
+            self._client.table("realtime_probe")
+            .upsert({"id": 1, "nonce": nonce, "pinged_at": datetime.now(UTC).isoformat()})
+            .execute()
+        )
