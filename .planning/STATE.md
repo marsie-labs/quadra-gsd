@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Session Skeleton
 status: executing
-stopped_at: Completed 01-03-PLAN.md
-last_updated: "2026-10-22T21:34:22.197Z"
+stopped_at: Completed 01-04-PLAN.md
+last_updated: "2026-10-22T21:39:45.958Z"
 last_activity: 2026-10-22
 last_activity_desc: Phase 01 execution started
-state_head: f9d560b45186c47fb0428c1e5bb9a85d0ddb3b70
+state_head: 3677d6a6ab17d9263a39711b1140f54857a9487a
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 6
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-22)
 ## Current Position
 
 Phase: 01 (Session Skeleton) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 Status: Ready to execute
 Last activity: 2026-10-22 — Phase 01 execution started
 
@@ -59,6 +59,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P01 | 40 min | 3 tasks | 12 files |
 | Phase 01 P02 | 90 min | 2 tasks | 12 files |
 | Phase 01 P03 | 3 min | 2 tasks | 9 files |
+| Phase 01 P04 | 6 min | 1 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,8 @@ Recent decisions affecting current work:
 - [Phase 01]: Hosted schema applied by the human after executor's db push was permission-denied; migration list shows 20261022000000 on Local and Remote
 - [Phase 01]: 01-03: retry session creation only on APIError 23505 and only once; all other codes propagate
 - [Phase 01]: 01-03: project-name length counts code points after trim in UI, service and DB (parity proven live)
+- [Phase 01]: Hosted Realtime accepts the sb_secret_ key; SUPABASE_REALTIME_KEY (legacy JWT) stays an optional override only — Live nonce round trip verified in 361-1266 ms with SUPABASE_REALTIME_KEY unset (01-04)
+- [Phase 01]: Realtime startup failures are sanitized and re-raised 'from None'; strict mode closes the client before raising — websockets exceptions can embed the apikey URL; avoids a leaked socket on aborted boot (01-04)
 
 ### Pending Todos
 
@@ -96,6 +99,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-22T21:34:22.183Z
-Stopped at: Completed 01-03-PLAN.md
+Last session: 2026-10-22T21:39:45.943Z
+Stopped at: Completed 01-04-PLAN.md
 Resume file: None

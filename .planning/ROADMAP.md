@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Opening a link with an unknown `session_id` shows a not-found page
   5. Developer can follow the README to set env vars, apply migrations to the hosted Supabase project, and start the app (single worker); a startup check confirms DB change events reach the Python server
 
-**Plans:** 3/6 plans executed
+**Plans:** 4/6 plans executed
 
 Plans:
 **Wave 1**
@@ -44,7 +44,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [x] 01-03-PLAN.md — Session link hardening: project-name validation, malformed-link 404, token retry, atomic-create/RLS proofs
-- [ ] 01-04-PLAN.md — Realtime hub: nonce-matched startup round-trip probe against hosted Supabase (settles which Realtime key works)
+- [x] 01-04-PLAN.md — Realtime hub: nonce-matched startup round-trip probe against hosted Supabase (settles which Realtime key works)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 01-05-PLAN.md — Composition root + /healthz, 1-year session cookie, single-worker launcher, README
@@ -122,7 +122,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Session Skeleton | 3/6 | In Progress | - |
+| 1. Session Skeleton | 4/6 | In Progress | - |
 | 2. Live Shared Canvas | 0/TBD | Not started | - |
 | 3. Card Editing | 0/TBD | Not started | - |
 | 4. Session Close & Lock | 0/TBD | Not started | - |
