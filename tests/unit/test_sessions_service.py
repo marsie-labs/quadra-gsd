@@ -3,6 +3,7 @@
 import pytest
 from postgrest.exceptions import APIError
 
+from app.deps import get_services
 from tests.ui.fakes import SEEDED_ID_A, SEEDED_NAME_A, FakeRepository, install_fake_services
 
 
@@ -85,9 +86,7 @@ async def test_non_collision_error_is_not_retried():
 )
 async def test_get_prefilters_malformed_ids_without_repository_call(bad_id):
     repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
-    import app.deps
-
-    assert await app.deps.services.sessions.get(bad_id) is None  # type: ignore[union-attr]
+    assert await get_services().sessions.get(bad_id) is None
     assert repo.get_calls == 0
 
 
@@ -99,9 +98,7 @@ async def test_get_unknown_well_formed_id_asks_the_repository():
 
 async def test_get_returns_quadrants_in_position_order():
     repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
-    import app.deps
-
-    view = await app.deps.services.sessions.get(SEEDED_ID_A)  # type: ignore[union-attr]
+    view = await get_services().sessions.get(SEEDED_ID_A)
     assert view is not None
     assert [q.position for q in view.quadrants] == [1, 2, 3, 4]
     assert [q.kind for q in view.quadrants] == ["IS", "IS_NOT", "DOES", "DOES_NOT"]
