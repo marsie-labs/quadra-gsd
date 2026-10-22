@@ -33,11 +33,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Opening a link with an unknown `session_id` shows a not-found page
   5. Developer can follow the README to set env vars, apply migrations to the hosted Supabase project, and start the app (single worker); a startup check confirms DB change events reach the Python server
 
-**Plans:** 6 plans
+**Plans:** 1/6 plans executed
 
 Plans:
 **Wave 1**
-- [ ] 01-01-PLAN.md — Toolchain bootstrap: dependency legitimacy gate, uv project, pytest/ruff config, Settings, Supabase CLI config
+- [x] 01-01-PLAN.md — Toolchain bootstrap: dependency legitimacy gate, uv project, pytest/ruff config, Settings, Supabase CLI config
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 01-02-PLAN.md — Tracer: home-page Create lands on /s/{session_id} rendered from hosted Supabase (init migration pushed)
@@ -122,7 +122,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Session Skeleton | 0/6 | Planned | - |
+| 1. Session Skeleton | 1/6 | In Progress | - |
 | 2. Live Shared Canvas | 0/TBD | Not started | - |
 | 3. Card Editing | 0/TBD | Not started | - |
 | 4. Session Close & Lock | 0/TBD | Not started | - |
