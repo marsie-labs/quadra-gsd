@@ -31,7 +31,14 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. First-time visitor is prompted for a display name; after a reload they are not asked again and their name is shown
   4. Opening a link with an unknown `session_id` shows a not-found page
   5. Developer can follow the README to set env vars, apply migrations to the hosted Supabase project, and start the app (single worker); a startup check confirms DB change events reach the Python server
-**Plans**: TBD
+**Plans:** 5 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Toolchain bootstrap: dependency legitimacy gate, uv project, pytest/ruff config, Settings, Supabase CLI config
+- [ ] 01-02-PLAN.md — Tracer: home-page Create lands on /s/{session_id} rendered from hosted Supabase (init migration pushed)
+- [ ] 01-03-PLAN.md — Session link hardening: project-name validation, malformed-link 404, token retry, atomic-create/RLS/second-browser proofs
+- [ ] 01-04-PLAN.md — Realtime startup proof, composition root + /healthz, single-worker launcher, README
+- [ ] 01-05-PLAN.md — Display-name identity: inline banner, per-browser memory, ensure_display_name() gate, author constraint
 **UI hint**: yes
 
 ### Phase 2: Live Shared Canvas
@@ -94,7 +101,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Session Skeleton | 0/TBD | Not started | - |
+| 1. Session Skeleton | 0/5 | Planned | - |
 | 2. Live Shared Canvas | 0/TBD | Not started | - |
 | 3. Card Editing | 0/TBD | Not started | - |
 | 4. Session Close & Lock | 0/TBD | Not started | - |

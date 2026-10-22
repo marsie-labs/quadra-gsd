@@ -586,14 +586,19 @@ REALTIME_CHECK=strict                        # strict | warn | off
 | A8 | Postgres Changes subscribe to a table missing from the publication fails silently or with CHANNEL_ERROR (unknown which) | Hub | Probe times out either way; message wording differs |
 | A9 | `notify pgrst, 'reload schema'` after DDL is unnecessary on hosted Supabase (auto-reload on DDL); adding it at the end of the migration is harmless | Migration | Stale schema cache → first RPC returns PGRST202; just add the NOTIFY if seen |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Does hosted Realtime accept the new `sb_secret_` key for Postgres Changes?**
+Resolved at planning time (2026-10-22, gsd-planner). Each resolution names the plan that carries it out.
+
+1. **Does hosted Realtime accept the new `sb_secret_` key for Postgres Changes?** RESOLVED (approach): 01-04 Task 1 settles it with a real run. `tests/integration/test_realtime_probe.py` and the strict startup check use `Settings.realtime_key()`, which is `SUPABASE_REALTIME_KEY` if set and the secret key otherwise. On failure at subscribe or no-event, the executor stops at an auth gate for the legacy `service_role` JWT, and the outcome is recorded in README `## Realtime key` and the 01-04 SUMMARY.
    - Known: key maps to `service_role` (BYPASSRLS) for the Data API; connections capped at 24 h; no official statement for the Realtime WS; realtime-py has no client-side JWT check, key goes straight into `?apikey=`.
    - Unclear: server-side acceptance and role mapping on the WS.
    - Recommendation: Plan a `checkpoint:human-action` (user supplies keys in `.env`, runs `supabase db push --linked`, starts the app). The strict startup check settles it; if it fails, user sets `SUPABASE_REALTIME_KEY` (legacy `service_role` JWT from dashboard) and README records which key worked. I did not fetch or use the user's keys.
-2. **`workspaces` vs `sessions` table name** (A2). Recommendation: keep `workspaces` + `session_id`; confirm at plan review.
-3. **Human steps requiring the user:** creating `.env` with secrets; `supabase db push --linked` (mutates hosted DB). Mark both as checkpoints.
+2. **`workspaces` vs `sessions` table name** (A2). Recommendation: keep `workspaces` + `session_id`; confirm at plan review. RESOLVED: 01-02 creates the `workspaces` table with public token column `session_id`, matching ARCHITECTURE.md. The agent API exposes `session_id`, so the table name stays internal. Flagged `costly` (reversibility) on the 01-02 tracer task.
+3. **Human steps requiring the user:** creating `.env` with secrets; `supabase db push --linked` (mutates hosted DB). Mark both as checkpoints. RESOLVED:
+   - `.env` is a `user_setup` item enforced by a `<precondition>` on the 01-02 tracer, so the executor halts with a blocking-human checkpoint if it is missing; `SUPABASE_PUBLISHABLE_KEY` is handled the same way in 01-03 Task 2.
+   - The push is automated by the executor (`supabase db push --linked --dry-run`, then `--yes`) per the automation-first rule.
+   - A planning-time probe showed `supabase migration list --linked` connecting through a minted login role without a password, which also largely resolves A5. If a password is ever demanded, that becomes a dynamic auth gate (`SUPABASE_DB_PASSWORD` exported in the shell), with the SQL-editor + `supabase migration repair` fallback.
 
 ## Environment Availability
 
