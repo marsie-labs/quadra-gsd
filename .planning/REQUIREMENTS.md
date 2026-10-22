@@ -105,12 +105,46 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| SESS-01 | Phase 1 | Pending |
+| SESS-02 | Phase 1 | Pending |
+| SESS-03 | Phase 1 | Pending |
+| SESS-04 | Phase 1 | Pending |
+| SESS-05 | Phase 1 | Pending |
+| IDEN-01 | Phase 1 | Pending |
+| IDEN-02 | Phase 1 | Pending |
+| IDEN-03 | Phase 1 | Pending |
+| QUAL-04 | Phase 1 | Pending |
+| CARD-01 | Phase 2 | Pending |
+| CARD-06 | Phase 2 | Pending |
+| CARD-07 | Phase 2 | Pending |
+| SYNC-01 | Phase 2 | Pending |
+| SYNC-02 | Phase 2 | Pending |
+| SYNC-03 | Phase 2 | Pending |
+| SYNC-04 | Phase 2 | Pending |
+| QUAL-02 | Phase 2 | Pending |
+| CARD-02 | Phase 3 | Pending |
+| CARD-03 | Phase 3 | Pending |
+| CARD-04 | Phase 3 | Pending |
+| CARD-05 | Phase 3 | Pending |
+| CARD-08 | Phase 3 | Pending |
+| CLOS-01 | Phase 4 | Pending |
+| CLOS-02 | Phase 4 | Pending |
+| CLOS-03 | Phase 4 | Pending |
+| CLOS-04 | Phase 4 | Pending |
+| CLOS-05 | Phase 4 | Pending |
+| API-01 | Phase 5 | Pending |
+| API-02 | Phase 5 | Pending |
+| API-03 | Phase 5 | Pending |
+| API-04 | Phase 5 | Pending |
+| API-05 | Phase 5 | Pending |
+| QUAL-01 | Phase 5 | Pending |
+| QUAL-03 | Phase 5 | Pending |
 
 **Coverage:**
 - v1 requirements: 34 total
-- Mapped to phases: 0
-- Unmapped: 34 ⚠️
+- Mapped to phases: 34
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-10-22*
-*Last updated: 2026-10-22 after initial definition*
+*Last updated: 2026-10-22 after roadmap creation*
