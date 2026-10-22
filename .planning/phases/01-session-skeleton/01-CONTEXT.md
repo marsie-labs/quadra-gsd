@@ -80,6 +80,8 @@ User chose not to discuss these; planner/researcher pick sensible defaults consi
 
 None — discussion stayed within phase scope.
 
+**Requirement remapping:** IDEN-03 moved to Phase 2 (2026-10-22, user decision at plan-check): cards are created in Phase 2; Phase 1 ships author column + ensure_display_name() groundwork.
+
 </deferred>
 
 ---

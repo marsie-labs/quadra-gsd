@@ -24,7 +24,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Goal**: A user can create a session, share its unguessable link, and teammates can open it, enter a display name, and see the four labeled quadrants. The schema, project setup and Realtime connection are proven underneath.
 **Mode:** mvp
 **Depends on**: Nothing (first phase)
-**Requirements**: SESS-01, SESS-02, SESS-03, SESS-04, SESS-05, IDEN-01, IDEN-02, IDEN-03, QUAL-04
+**Requirements**: SESS-01, SESS-02, SESS-03, SESS-04, SESS-05, IDEN-01, IDEN-02, QUAL-04
 **Success Criteria** (what must be TRUE):
   1. User enters a project name on the home page and lands on `/s/<session_id>`, where `session_id` is a ≥128-bit random token
   2. Opening that link in a second browser, with no login, shows the same session with four labeled quadrants: IS, IS NOT, DOES, DOES NOT
@@ -46,7 +46,7 @@ Plans:
 **Goal**: Participants add cards to any quadrant, and every connected browser on the session sees them appear live, relayed by the Python server from Supabase Realtime.
 **Mode:** mvp
 **Depends on**: Phase 1
-**Requirements**: CARD-01, CARD-06, CARD-07, SYNC-01, SYNC-02, SYNC-03, SYNC-04, QUAL-02
+**Requirements**: IDEN-03, CARD-01, CARD-06, CARD-07, SYNC-01, SYNC-02, SYNC-03, SYNC-04, QUAL-02
 **Success Criteria** (what must be TRUE):
   1. Participant can add a text card to any quadrant; empty text and text over 500 characters are rejected with a message
   2. A card added in browser A appears in browser B within ~1s without refresh, showing author name and time; it is stored with quadrant, order index, author and timestamps

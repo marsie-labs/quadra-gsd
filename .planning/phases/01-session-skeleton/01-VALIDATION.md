@@ -50,7 +50,7 @@ Task IDs are assigned by the planner; rows are seeded per requirement from RESEA
 | TBD | TBD | TBD | SESS-05 | session-id enumeration | Uniform 404 for unknown/malformed id; malformed id never hits DB | ui | `uv run pytest tests/ui/test_not_found.py -q` | ❌ W0 | ⬜ pending |
 | TBD | TBD | TBD | IDEN-01 | stored XSS | Banner shown, canvas visible; user text rendered via `ui.label` only | ui | `uv run pytest tests/ui/test_identity.py -q` | ❌ W0 | ⬜ pending |
 | TBD | TBD | TBD | IDEN-02 | cookie forgery | Name persists across reload/sessions via signed storage cookie; no rename UI | ui | `uv run pytest tests/ui/test_identity.py -q` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | IDEN-03 | — | `validate_display_name` (trim/empty/≤40/duplicates ok); `ensure_display_name` blocks then completes | unit + ui | `uv run pytest tests/unit/test_identity.py tests/ui/test_ensure_name.py -q` | ❌ W0 | ⬜ pending |
+| TBD | TBD | TBD | IDEN-01 | — | D-02 authoring gate, groundwork for IDEN-03 (moved to Phase 2): `validate_display_name` (trim/empty/≤40/duplicates ok); `ensure_display_name` blocks then completes | unit + ui | `uv run pytest tests/unit/test_identity.py tests/ui/test_ensure_name.py -q` | ❌ W0 | ⬜ pending |
 | TBD | TBD | TBD | QUAL-04 | secret leakage | Settings require secrets (`SecretStr`); `/healthz`; hub dispatch; probe round-trip; keys/WS URL never logged | unit + integration | `uv run pytest tests/unit -q`; `uv run pytest -m integration tests/integration/test_realtime_probe.py -q` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*

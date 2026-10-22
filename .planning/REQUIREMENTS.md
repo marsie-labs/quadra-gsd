@@ -112,7 +112,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SESS-05 | Phase 1 | Pending |
 | IDEN-01 | Phase 1 | Pending |
 | IDEN-02 | Phase 1 | Pending |
-| IDEN-03 | Phase 1 | Pending |
+| IDEN-03 | Phase 2 | Pending |
 | QUAL-04 | Phase 1 | Pending |
 | CARD-01 | Phase 2 | Pending |
 | CARD-06 | Phase 2 | Pending |
@@ -147,4 +147,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-10-22*
-*Last updated: 2026-10-22 after roadmap creation*
+*Last updated: 2026-10-22 after Phase 1 plan-check (IDEN-03 remapped from Phase 1 to Phase 2 by user decision)*
