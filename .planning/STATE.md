@@ -64,7 +64,7 @@ None yet.
 ### Blockers/Concerns
 
 - [Phase 1]: Verify supabase-py Realtime accepts new `sb_secret_` key; fall back to legacy service_role JWT
-- [Phase 1]: Supabase CLI link to hosted project may need interactive `supabase login` / `supabase link` by user
+- [Phase 1]: ✓ Supabase CLI linked to hosted project (ref `fligjsqzjoyedcuolwss`, 2026-10-22). No `supabase/config.toml` yet (`supabase init` pending); add `supabase/.temp/` to .gitignore
 
 ## Deferred Items
 
