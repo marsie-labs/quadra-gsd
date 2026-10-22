@@ -21,6 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 ## Phase Details
 
 ### Phase 1: Session Skeleton
+
 **Goal**: A user can create a session, share its unguessable link, and teammates can open it, enter a display name, and see the four labeled quadrants. The schema, project setup and Realtime connection are proven underneath.
 **Mode:** mvp
 **Depends on**: Nothing (first phase)
@@ -31,18 +32,30 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. First-time visitor is prompted for a display name; after a reload they are not asked again and their name is shown
   4. Opening a link with an unknown `session_id` shows a not-found page
   5. Developer can follow the README to set env vars, apply migrations to the hosted Supabase project, and start the app (single worker); a startup check confirms DB change events reach the Python server
+
 **Plans:** 6 plans
 
 Plans:
+**Wave 1**
 - [ ] 01-01-PLAN.md — Toolchain bootstrap: dependency legitimacy gate, uv project, pytest/ruff config, Settings, Supabase CLI config
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 01-02-PLAN.md — Tracer: home-page Create lands on /s/{session_id} rendered from hosted Supabase (init migration pushed)
+
+**Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 01-03-PLAN.md — Session link hardening: project-name validation, malformed-link 404, token retry, atomic-create/RLS proofs
 - [ ] 01-04-PLAN.md — Realtime hub: nonce-matched startup round-trip probe against hosted Supabase (settles which Realtime key works)
+
+**Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 01-05-PLAN.md — Composition root + /healthz, 1-year session cookie, single-worker launcher, README
+
+**Wave 5** *(blocked on Wave 4 completion)*
 - [ ] 01-06-PLAN.md — Display-name identity: inline banner, per-browser memory, ensure_display_name() gate, author constraint, second no-login browser
+
 **UI hint**: yes
 
 ### Phase 2: Live Shared Canvas
+
 **Goal**: Participants add cards to any quadrant, and every connected browser on the session sees them appear live, relayed by the Python server from Supabase Realtime.
 **Mode:** mvp
 **Depends on**: Phase 1
@@ -53,10 +66,12 @@ Plans:
   3. A card row inserted directly in the database (e.g. Supabase SQL editor) appears live in open browsers, which proves updates come from Realtime and not polling
   4. After a browser reconnect or a server restart, the canvas shows every card, including ones added while disconnected
   5. An automated integration test against Supabase shows two clients converging on the same cards via Realtime
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 3: Card Editing
+
 **Goal**: Participants can edit, delete, move and reorder cards collaboratively, and their own actions feel instant.
 **Mode:** mvp
 **Depends on**: Phase 2
@@ -67,10 +82,12 @@ Plans:
   3. Participant can move a card to another quadrant via a move menu; it leaves the old quadrant and appears in the new one for all clients
   4. Participant can reorder a card up/down within its quadrant; order matches across clients and after reload
   5. The acting participant sees their change instantly with no duplicate or flicker when the Realtime echo arrives; a failed write rolls back with a message
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 4: Session Close & Lock
+
 **Goal**: Any participant can finish the session with a confirmation. The canvas then becomes permanently read-only for everyone, and the database guarantees it.
 **Mode:** mvp
 **Depends on**: Phase 3
@@ -80,10 +97,12 @@ Plans:
   2. After confirming, all connected clients switch to read-only and show a closed banner within ~1s
   3. Card writes to a closed session (stale tab, direct repository/DB call) are rejected by the database, and the user sees a clear "session closed" message
   4. Closing an already-closed session is a harmless no-op, and no path (UI or DB) can reopen it
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 5: Agent Results & E2E
+
 **Goal**: The external agent harness can fetch a closed session's complete, structured snapshot by `session_id`, and the whole flow is verified end to end.
 **Mode:** mvp
 **Depends on**: Phase 4
@@ -93,6 +112,7 @@ Plans:
   2. For a closed session it returns 200 JSON with session_id, project_name, status, created_at, closed_at, and four quadrants whose cards (id, text, author, created_at, updated_at) are ordered by order index, with soft-deleted cards excluded
   3. Automated test suite covering card operations, close/lock rules and all three agent responses passes
   4. Documented E2E demo works: create session → 2+ browsers edit live → close → agent GET returns the full JSON
+
 **Plans**: TBD
 
 ## Progress
