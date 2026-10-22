@@ -9,11 +9,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Sessions
 
-- [ ] **SESS-01**: User can create a session by entering a project name and lands on that session's unique link
-- [ ] **SESS-02**: Session link contains an unguessable `session_id` (≥128-bit random token)
-- [ ] **SESS-03**: New session starts open with four quadrants IS, IS NOT, DOES, DOES NOT (created atomically)
+- [x] **SESS-01**: User can create a session by entering a project name and lands on that session's unique link
+- [x] **SESS-02**: Session link contains an unguessable `session_id` (≥128-bit random token)
+- [x] **SESS-03**: New session starts open with four quadrants IS, IS NOT, DOES, DOES NOT (created atomically)
 - [ ] **SESS-04**: Anyone with the link can open and edit the session without logging in
-- [ ] **SESS-05**: Opening an unknown session link shows a not-found page
+- [x] **SESS-05**: Opening an unknown session link shows a not-found page
 
 ### Identity
 
@@ -105,11 +105,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SESS-01 | Phase 1 | Pending |
-| SESS-02 | Phase 1 | Pending |
-| SESS-03 | Phase 1 | Pending |
+| SESS-01 | Phase 1 | Complete |
+| SESS-02 | Phase 1 | Complete |
+| SESS-03 | Phase 1 | Complete |
 | SESS-04 | Phase 1 | Pending |
-| SESS-05 | Phase 1 | Pending |
+| SESS-05 | Phase 1 | Complete |
 | IDEN-01 | Phase 1 | Pending |
 | IDEN-02 | Phase 1 | Pending |
 | IDEN-03 | Phase 2 | Pending |

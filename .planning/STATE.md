@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Session Skeleton
 status: executing
-stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-10-22T21:28:58.813Z"
+stopped_at: Completed 01-03-PLAN.md
+last_updated: "2026-10-22T21:34:22.197Z"
 last_activity: 2026-10-22
 last_activity_desc: Phase 01 execution started
-state_head: 37ae154bf3b7d41cb8db6294017140702bd8eab1
+state_head: f9d560b45186c47fb0428c1e5bb9a85d0ddb3b70
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 6
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-22)
 ## Current Position
 
 Phase: 01 (Session Skeleton) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Status: Ready to execute
 Last activity: 2026-10-22 — Phase 01 execution started
 
@@ -58,6 +58,7 @@ Progress: [░░░░░░░░░░] 0%
 |------|----------|-------|-------|
 | Phase 01 P01 | 40 min | 3 tasks | 12 files |
 | Phase 01 P02 | 90 min | 2 tasks | 12 files |
+| Phase 01 P03 | 3 min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,8 @@ Recent decisions affecting current work:
 - [Phase 01]: 01-01: ruff excludes .claude/.planning/.gsd since ruff 0.17 formats markdown code blocks
 - [Phase 01]: Table named workspaces with public token column session_id; connect() folded into app/db/repository.py; PGRST201 FK hint not needed
 - [Phase 01]: Hosted schema applied by the human after executor's db push was permission-denied; migration list shows 20261022000000 on Local and Remote
+- [Phase 01]: 01-03: retry session creation only on APIError 23505 and only once; all other codes propagate
+- [Phase 01]: 01-03: project-name length counts code points after trim in UI, service and DB (parity proven live)
 
 ### Pending Todos
 
@@ -93,6 +96,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-22T21:28:58.799Z
-Stopped at: Completed 01-02-PLAN.md
+Last session: 2026-10-22T21:34:22.183Z
+Stopped at: Completed 01-03-PLAN.md
 Resume file: None
