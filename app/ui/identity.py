@@ -71,3 +71,37 @@ def name_banner(on_saved: Callable[[str], None]) -> ui.element:
         field.on("keydown.enter", submit)
         ui.button("Save", on_click=submit)
     return banner
+
+
+async def ensure_display_name(on_saved: Callable[[str], None] | None = None) -> str | None:
+    """Authoring gate (D-02): the stored name, or a name collected via a dialog, or None.
+
+    Returns the stored name immediately with no dialog. Otherwise opens a name dialog and returns
+    the saved name once valid, or None on Cancel - the caller must then abort its action. It never
+    returns or invents a placeholder.
+    """
+    existing = current_name()
+    if existing is not None:
+        return existing
+
+    with ui.dialog() as dialog, ui.card():
+        ui.label("Enter your name to continue")
+        field = ui.input("Your name")
+
+        def submit() -> None:
+            name = save_display_name(field.value)
+            if name is None:
+                field.error = NAME_ERROR
+                return
+            dialog.submit(name)
+
+        field.on("keydown.enter", submit)
+        with ui.row():
+            ui.button("Cancel", on_click=lambda: dialog.submit(None))
+            ui.button("Continue", on_click=submit)
+
+    result = await dialog
+    dialog.delete()
+    if result and on_saved is not None:
+        on_saved(result)
+    return result or None
