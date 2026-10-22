@@ -12,13 +12,13 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **SESS-01**: User can create a session by entering a project name and lands on that session's unique link
 - [x] **SESS-02**: Session link contains an unguessable `session_id` (≥128-bit random token)
 - [x] **SESS-03**: New session starts open with four quadrants IS, IS NOT, DOES, DOES NOT (created atomically)
-- [ ] **SESS-04**: Anyone with the link can open and edit the session without logging in
+- [x] **SESS-04**: Anyone with the link can open and edit the session without logging in
 - [x] **SESS-05**: Opening an unknown session link shows a not-found page
 
 ### Identity
 
-- [ ] **IDEN-01**: On first visit, participant is prompted for a display name
-- [ ] **IDEN-02**: Display name is remembered in the browser across reloads and sessions
+- [x] **IDEN-01**: On first visit, participant is prompted for a display name
+- [x] **IDEN-02**: Display name is remembered in the browser across reloads and sessions
 - [ ] **IDEN-03**: Participant's display name is recorded as author on cards they create
 
 ### Cards
@@ -108,10 +108,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SESS-01 | Phase 1 | Complete |
 | SESS-02 | Phase 1 | Complete |
 | SESS-03 | Phase 1 | Complete |
-| SESS-04 | Phase 1 | Pending |
+| SESS-04 | Phase 1 | Complete |
 | SESS-05 | Phase 1 | Complete |
-| IDEN-01 | Phase 1 | Pending |
-| IDEN-02 | Phase 1 | Pending |
+| IDEN-01 | Phase 1 | Complete |
+| IDEN-02 | Phase 1 | Complete |
 | IDEN-03 | Phase 2 | Pending |
 | QUAL-04 | Phase 1 | Complete |
 | CARD-01 | Phase 2 | Pending |

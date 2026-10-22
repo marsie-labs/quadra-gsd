@@ -2,17 +2,17 @@
 gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Session Skeleton
-status: executing
-stopped_at: Completed 01-05-PLAN.md
-last_updated: "2026-10-22T21:44:39.995Z"
+status: verifying
+stopped_at: Completed 01-06-PLAN.md
+last_updated: "2026-10-22T22:11:21.471Z"
 last_activity: 2026-10-22
 last_activity_desc: Phase 01 execution started
-state_head: e4f34ea6a6c342dd983e0a15f579ccc38b3a81a3
+state_head: c89eca582e6ad3243151f7649aca0fe373b5f4d2
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
   percent: 0
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-22)
 
 Phase: 01 (Session Skeleton) — EXECUTING
 Plan: 6 of 6
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-22 — Phase 01 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -61,6 +61,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P03 | 3 min | 2 tasks | 9 files |
 | Phase 01 P04 | 6 min | 1 tasks | 5 files |
 | Phase 01 P05 | 4 min | 2 tasks | 5 files |
+| Phase 01 P06 | 2 min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,7 @@ Recent decisions affecting current work:
 - [Phase 01]: Realtime startup failures are sanitized and re-raised 'from None'; strict mode closes the client before raising — websockets exceptions can embed the apikey URL; avoids a leaked socket on aborted boot (01-04)
 - [Phase 01]: 01-05: Launcher hard-codes workers=1 (never env-driven); health route and launcher unit-tested without in-process create_app() because it mutates NiceGUI globals
 - [Phase 01]: 01-05: Strict Realtime check failure aborts startup via the lifespan raising RealtimeCheckError; finally block still stops hub and closes the client
+- [Phase 01]: 01-06: save_display_name never overwrites a stored name (D-03); name length counted in code points after trim to match DB char_length
 
 ### Pending Todos
 
@@ -102,6 +104,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-22T21:44:39.980Z
-Stopped at: Completed 01-05-PLAN.md
+Last session: 2026-10-22T22:11:21.455Z
+Stopped at: Completed 01-06-PLAN.md
 Resume file: None
