@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Session Skeleton
 status: executing
-stopped_at: Completed 01-04-PLAN.md
-last_updated: "2026-10-22T21:39:45.958Z"
+stopped_at: Completed 01-05-PLAN.md
+last_updated: "2026-10-22T21:44:39.995Z"
 last_activity: 2026-10-22
 last_activity_desc: Phase 01 execution started
-state_head: 3677d6a6ab17d9263a39711b1140f54857a9487a
+state_head: e4f34ea6a6c342dd983e0a15f579ccc38b3a81a3
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-22)
 ## Current Position
 
 Phase: 01 (Session Skeleton) — EXECUTING
-Plan: 5 of 6
+Plan: 6 of 6
 Status: Ready to execute
 Last activity: 2026-10-22 — Phase 01 execution started
 
@@ -60,6 +60,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P02 | 90 min | 2 tasks | 12 files |
 | Phase 01 P03 | 3 min | 2 tasks | 9 files |
 | Phase 01 P04 | 6 min | 1 tasks | 5 files |
+| Phase 01 P05 | 4 min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,8 @@ Recent decisions affecting current work:
 - [Phase 01]: 01-03: project-name length counts code points after trim in UI, service and DB (parity proven live)
 - [Phase 01]: Hosted Realtime accepts the sb_secret_ key; SUPABASE_REALTIME_KEY (legacy JWT) stays an optional override only — Live nonce round trip verified in 361-1266 ms with SUPABASE_REALTIME_KEY unset (01-04)
 - [Phase 01]: Realtime startup failures are sanitized and re-raised 'from None'; strict mode closes the client before raising — websockets exceptions can embed the apikey URL; avoids a leaked socket on aborted boot (01-04)
+- [Phase 01]: 01-05: Launcher hard-codes workers=1 (never env-driven); health route and launcher unit-tested without in-process create_app() because it mutates NiceGUI globals
+- [Phase 01]: 01-05: Strict Realtime check failure aborts startup via the lifespan raising RealtimeCheckError; finally block still stops hub and closes the client
 
 ### Pending Todos
 
@@ -99,6 +102,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-22T21:39:45.943Z
-Stopped at: Completed 01-04-PLAN.md
+Last session: 2026-10-22T21:44:39.980Z
+Stopped at: Completed 01-05-PLAN.md
 Resume file: None

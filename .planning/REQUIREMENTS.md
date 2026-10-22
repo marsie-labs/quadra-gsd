@@ -60,7 +60,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **QUAL-01**: Automated tests cover card operations, close/lock rules, and all agent responses
 - [ ] **QUAL-02**: Integration tests against real Supabase verify realtime propagation between two clients
 - [ ] **QUAL-03**: Documented E2E demo: create → 2+ browsers edit live → close → agent GET returns full JSON
-- [ ] **QUAL-04**: App runs locally with documented setup (env vars, migrations, single worker)
+- [x] **QUAL-04**: App runs locally with documented setup (env vars, migrations, single worker)
 
 ## v2 Requirements
 
@@ -113,7 +113,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | IDEN-01 | Phase 1 | Pending |
 | IDEN-02 | Phase 1 | Pending |
 | IDEN-03 | Phase 2 | Pending |
-| QUAL-04 | Phase 1 | Pending |
+| QUAL-04 | Phase 1 | Complete |
 | CARD-01 | Phase 2 | Pending |
 | CARD-06 | Phase 2 | Pending |
 | CARD-07 | Phase 2 | Pending |
