@@ -6,6 +6,10 @@ from typing import Any
 from app.settings import Settings
 from supabase import AsyncClient, acreate_client
 
+CARD_COLUMNS = (
+    "id, workspace_id, quadrant_id, text, order_index, author, created_at, updated_at, deleted_at"
+)
+
 
 async def connect(settings: Settings) -> AsyncClient:
     """Create the async Supabase client with the server-side secret key."""
@@ -51,3 +55,44 @@ class Repository:
             .upsert({"id": 1, "nonce": nonce, "pinged_at": datetime.now(UTC).isoformat()})
             .execute()
         )
+
+    async def insert_card(
+        self,
+        *,
+        workspace_id: str,
+        quadrant_id: str,
+        text: str,
+        author: str,
+        order_index: float,
+    ) -> dict[str, Any]:
+        """Insert one card; id, created_at and updated_at come from the database defaults."""
+        resp = await (
+            self._client.table("cards")
+            .insert(
+                {
+                    "workspace_id": workspace_id,
+                    "quadrant_id": quadrant_id,
+                    "text": text,
+                    "author": author,
+                    "order_index": order_index,
+                }
+            )
+            .execute()
+        )
+        return resp.data[0]
+
+    async def max_order_index(self, quadrant_id: str) -> float | None:
+        """Highest order_index among the quadrant's live cards, or None when it has none."""
+        resp = await (
+            self._client.table("cards")
+            .select("order_index")
+            .eq("quadrant_id", quadrant_id)
+            .is_("deleted_at", "null")
+            .order("order_index", desc=True)
+            .limit(1)
+            .execute()
+        )
+        rows = resp.data
+        if not rows:
+            return None
+        return float(rows[0]["order_index"])

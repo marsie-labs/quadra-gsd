@@ -2,12 +2,14 @@
 
 from dataclasses import dataclass
 
+from app.realtime.hub import RealtimeHub
 from app.services.sessions import SessionService
 
 
 @dataclass
 class Services:
     sessions: SessionService
+    hub: RealtimeHub
 
 
 services: Services | None = None

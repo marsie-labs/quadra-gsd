@@ -5,6 +5,7 @@ import pytest
 import app.deps
 from app.db.repository import Repository, connect
 from app.deps import Services
+from app.realtime.hub import RealtimeHub
 from app.services.sessions import SessionService
 from app.settings import Settings
 
@@ -33,8 +34,22 @@ async def supabase_client(integration_settings):
 
 
 @pytest.fixture
-async def real_services(supabase_client) -> Services:
-    return Services(sessions=SessionService(Repository(supabase_client)))
+async def real_services(supabase_client, integration_settings) -> Services:
+    # This hub is never started, so the Phase 1 e2e tests keep working without Realtime.
+    hub = RealtimeHub(integration_settings.supabase_url, integration_settings.realtime_key())
+    return Services(sessions=SessionService(Repository(supabase_client)), hub=hub)
+
+
+@pytest.fixture
+async def live_services(supabase_client, integration_settings):
+    """Real services whose hub is started and strict-verified: CDC flows before a test writes."""
+    repo = Repository(supabase_client)
+    hub = RealtimeHub(integration_settings.supabase_url, integration_settings.realtime_key())
+    await hub.run_startup_check("strict", repo.upsert_probe, timeout=20)
+    try:
+        yield Services(sessions=SessionService(repo), hub=hub)
+    finally:
+        await hub.stop()
 
 
 @pytest.fixture

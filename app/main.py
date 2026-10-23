@@ -50,8 +50,8 @@ def make_lifespan(
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         client = await connect(settings)
         repo = Repository(client)
-        deps.services = Services(sessions=SessionService(repo))
         hub = RealtimeHub(settings.supabase_url, settings.realtime_key())
+        deps.services = Services(sessions=SessionService(repo), hub=hub)
         app.state.hub = hub
         try:
             # strict mode raises RealtimeCheckError here, which aborts startup.

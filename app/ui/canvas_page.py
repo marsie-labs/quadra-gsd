@@ -3,7 +3,7 @@
 from nicegui import ui
 
 from app.deps import get_services
-from app.models import QUADRANT_LABELS
+from app.ui.canvas_view import CanvasView
 from app.ui.identity import current_name, name_banner
 
 
@@ -29,8 +29,10 @@ def register() -> None:
         if current_name() is None:
             # Inline and ignorable, never a blocking modal (D-01).
             name_banner(on_saved=on_name_saved)
-        with ui.grid().classes("grid-cols-1 md:grid-cols-2 gap-4 w-full"):
-            for q in sorted(view.quadrants, key=lambda q: q.position):
-                with ui.card().mark(f"quadrant-{q.kind}"):
-                    ui.label(QUADRANT_LABELS[q.kind]).classes("text-h6")
-                    ui.label("No cards yet").classes("text-grey")
+
+        canvas_view = CanvasView(view, on_name_saved=on_name_saved)
+        canvas_view.build()
+        hub = get_services().hub
+        hub.register(canvas_view)
+        # Closed tabs must leave the registry, or the hub keeps feeding dead views (Pitfall 4).
+        ui.context.client.on_delete(lambda: hub.unregister(canvas_view))

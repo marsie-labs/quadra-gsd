@@ -6,12 +6,14 @@ validation, retry and pre-filter logic under test is production code; only Postg
 
 import asyncio
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 from postgrest.exceptions import APIError
 
 import app.deps
 from app.deps import Services
+from app.realtime.hub import RealtimeHub
 from app.services.sessions import SessionService
 from app.tokens import SESSION_ID_RE
 
@@ -36,6 +38,8 @@ class FakeRepository:
         self.get_calls = 0
         self.fail_next_create_codes: list[str] = []
         self.create_gate: asyncio.Event | None = None
+        self.cards: dict[str, dict[str, Any]] = {}
+        self.insert_calls = 0
 
     async def create_session(self, project_name: str, session_id: str) -> str:
         self.create_calls += 1
@@ -68,6 +72,48 @@ class FakeRepository:
             return None
         return {**row, "quadrants": [dict(q) for q in row["quadrants"]]}
 
+    async def insert_card(
+        self,
+        *,
+        workspace_id: str,
+        quadrant_id: str,
+        text: str,
+        author: str,
+        order_index: float,
+    ) -> dict[str, Any]:
+        """Mirror the cards constraints: composite FK, text 1-500 (btrim spaces), author 1-40."""
+        self.insert_calls += 1
+        owned = any(
+            row["id"] == workspace_id and any(q["id"] == quadrant_id for q in row["quadrants"])
+            for row in self.rows.values()
+        )
+        if not owned:
+            raise APIError({"code": "23503", "message": "foreign key violation"})
+        if not 1 <= len(text.strip(" ")) <= 500 or not 1 <= len(author) <= 40:
+            raise APIError({"code": "23514", "message": "check constraint violated"})
+        now = datetime.now(UTC).isoformat()
+        row = {
+            "id": str(uuid.uuid4()),
+            "workspace_id": workspace_id,
+            "quadrant_id": quadrant_id,
+            "text": text,
+            "order_index": order_index,
+            "author": author,
+            "created_at": now,
+            "updated_at": now,
+            "deleted_at": None,
+        }
+        self.cards[row["id"]] = row
+        return dict(row)
+
+    async def max_order_index(self, quadrant_id: str) -> float | None:
+        values = [
+            c["order_index"]
+            for c in self.cards.values()
+            if c["quadrant_id"] == quadrant_id and c["deleted_at"] is None
+        ]
+        return max(values) if values else None
+
 
 def install_fake_services(seed: dict[str, str] | None = None) -> FakeRepository:
     """Seed ``{session_id: project_name}`` rows and install a real service over the fake."""
@@ -83,5 +129,7 @@ def install_fake_services(seed: dict[str, str] | None = None) -> FakeRepository:
                 for position, kind in enumerate(_KINDS, start=1)
             ],
         }
-    app.deps.services = Services(sessions=SessionService(repo))  # type: ignore[arg-type]
+    # The hub is never started and needs no network.
+    hub = RealtimeHub("https://example.supabase.co", "sb_secret_FAKE_FOR_UI_TESTS")
+    app.deps.services = Services(sessions=SessionService(repo), hub=hub)  # type: ignore[arg-type]
     return repo

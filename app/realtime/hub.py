@@ -1,6 +1,8 @@
-"""RealtimeHub: the only owner of the Supabase Realtime connection.
+"""RealtimeHub: owns the Supabase Realtime connection, the canvas registry and the fan-out.
 
-One ``AsyncRealtimeClient``, one channel. The startup check proves that a database change
+One ``AsyncRealtimeClient``, one channel. Open canvases register as listeners keyed by their
+workspace_id; a ``cards`` Postgres Changes event is routed to the listeners of the row's own
+workspace only. The hub never reads the database. The startup check proves that a database change
 event reaches this process: it upserts a ``realtime_probe`` row carrying a fresh random
 nonce and reports ``verified`` only when the Postgres Changes event for *that* nonce arrives.
 A merely SUBSCRIBED channel is never reported as success.
@@ -15,10 +17,13 @@ import re
 import secrets
 import time
 from collections.abc import Awaitable, Callable
-from typing import Any, Literal
+from typing import Any, Literal, Protocol
 
+from pydantic import ValidationError
 from realtime import AsyncRealtimeChannel, AsyncRealtimeClient
 from realtime.types import RealtimePostgresChangesListenEvent, RealtimeSubscribeStates
+
+from app.models import CardView
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +46,14 @@ _FIXES = (
 )
 
 
+class CardListener(Protocol):
+    """An open canvas: receives the cards of its own workspace."""
+
+    workspace_id: str
+
+    def apply_card(self, card: CardView) -> None: ...
+
+
 class RealtimeCheckError(RuntimeError):
     """The Realtime startup check failed at a named stage."""
 
@@ -61,6 +74,24 @@ class RealtimeHub:
         self.latency_ms: float | None = None
         self._waiters: dict[str, asyncio.Future[float]] = {}
         self._channel: AsyncRealtimeChannel | None = None
+        self._listeners: dict[str, set[CardListener]] = {}
+
+    def register(self, listener: CardListener) -> None:
+        self._listeners.setdefault(listener.workspace_id, set()).add(listener)
+
+    def unregister(self, listener: CardListener) -> None:
+        """Idempotent: unknown listeners are ignored; empty workspace sets are dropped."""
+        listeners = self._listeners.get(listener.workspace_id)
+        if listeners is None:
+            return
+        listeners.discard(listener)
+        if not listeners:
+            del self._listeners[listener.workspace_id]
+
+    def listener_count(self, workspace_id: str | None = None) -> int:
+        if workspace_id is None:
+            return sum(len(v) for v in self._listeners.values())
+        return len(self._listeners.get(workspace_id, ()))
 
     def _sanitize(self, text: str) -> str:
         if self._key:
@@ -76,8 +107,34 @@ class RealtimeHub:
             table="realtime_probe",
             schema="public",
         )
-        # Phase 2 adds its cards / workspaces bindings here, before subscribe().
+        channel.on_postgres_changes(
+            RealtimePostgresChangesListenEvent.All,
+            self._on_card,
+            table="cards",
+            schema="public",
+        )
+        # Later plans add the workspaces binding here, before subscribe().
         return channel
+
+    def _on_card(self, payload: Any) -> None:
+        """Plain def (called synchronously in the socket loop): fan a card row out to its canvases.
+
+        Never raises and never logs the payload. Routing is strictly by the row's workspace_id.
+        """
+        try:
+            record = payload["data"]["record"]
+            # DELETE events carry only old_record (projected in 02-03): nothing to dispatch.
+            if not record or "id" not in record or "workspace_id" not in record:
+                return
+            card = CardView.model_validate(record)
+        except (KeyError, TypeError, ValidationError) as exc:
+            logger.warning("ignored cards event: %s", type(exc).__name__)
+            return
+        for listener in list(self._listeners.get(card.workspace_id, ())):
+            try:
+                listener.apply_card(card)
+            except Exception as exc:
+                logger.warning("canvas listener failed: %s", type(exc).__name__)
 
     def _on_probe(self, payload: Any) -> None:
         """Plain def: realtime-py calls it synchronously inside the socket listen loop."""
