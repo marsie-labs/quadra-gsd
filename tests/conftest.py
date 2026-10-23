@@ -1,6 +1,7 @@
 """Shared fixtures. Integration fixtures need a .env pointing at the hosted Supabase project."""
 
 import pytest
+from pydantic import ValidationError
 
 import app.deps
 from app.db.repository import Repository, connect
@@ -20,10 +21,14 @@ def reset_services():
 def integration_settings() -> Settings:
     try:
         return Settings()
-    except Exception:
-        pytest.skip(
-            "integration: .env with SUPABASE_URL, SUPABASE_SECRET_KEY, STORAGE_SECRET required"
-        )
+    except ValidationError as exc:
+        # Skip only when variables are absent. A malformed value (e.g. a short STORAGE_SECRET)
+        # must fail the run, or a broken .env would let the integration suite pass vacuously.
+        if all(error["type"] == "missing" for error in exc.errors()):
+            pytest.skip(
+                "integration: .env with SUPABASE_URL, SUPABASE_SECRET_KEY, STORAGE_SECRET required"
+            )
+        raise
 
 
 @pytest.fixture
