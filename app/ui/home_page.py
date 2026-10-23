@@ -13,22 +13,28 @@ logger = logging.getLogger(__name__)
 def register() -> None:
     @ui.page("/")
     async def home() -> None:
+        creating = False  # per page instance (one browser tab); never shared across browsers
+
         async def create() -> None:
-            if not name_input.validate():
+            nonlocal creating
+            if creating or not name_input.validate():
                 return
-            create_button.disable()  # in-flight guard: a double-click must create one session
+            creating = True  # set before the first await so a second Enter/click returns early
+            create_button.disable()
             try:
                 session_id = await get_services().sessions.create_session(name_input.value or "")
             except InvalidProjectName:
                 name_input.error = PROJECT_NAME_ERROR
-                return
             except Exception as exc:
                 logger.warning("create_session failed: %s", exc)
                 ui.notify("Could not create the session. Please try again.", type="negative")
+            else:
+                # Success: stay locked until the browser leaves the page.
+                ui.navigate.to(f"/s/{session_id}")
                 return
-            finally:
-                create_button.enable()
-            ui.navigate.to(f"/s/{session_id}")
+            # Every non-success outcome falls through to here so the user can retry.
+            creating = False
+            create_button.enable()
 
         ui.label("Quadra").classes("text-h4")
         name_input = ui.input(

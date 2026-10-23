@@ -4,6 +4,7 @@
 validation, retry and pre-filter logic under test is production code; only PostgREST is faked.
 """
 
+import asyncio
 import uuid
 from typing import Any
 
@@ -23,16 +24,23 @@ _KINDS = ("IS", "IS_NOT", "DOES", "DOES_NOT")
 
 
 class FakeRepository:
-    """Mimics ``Repository`` including the DB CHECK constraints and unique session_id."""
+    """Mimics ``Repository`` including the DB CHECK constraints and unique session_id.
+
+    ``create_gate`` (an unset ``asyncio.Event``) holds a create in flight for the
+    double-trigger tests.
+    """
 
     def __init__(self) -> None:
         self.rows: dict[str, dict[str, Any]] = {}
         self.create_calls = 0
         self.get_calls = 0
         self.fail_next_create_codes: list[str] = []
+        self.create_gate: asyncio.Event | None = None
 
     async def create_session(self, project_name: str, session_id: str) -> str:
         self.create_calls += 1
+        if self.create_gate is not None:
+            await self.create_gate.wait()
         if self.fail_next_create_codes:
             code = self.fail_next_create_codes.pop(0)
             raise APIError({"code": code, "message": "injected"})
