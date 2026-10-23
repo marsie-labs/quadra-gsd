@@ -7,11 +7,17 @@ event reaches this process: it upserts a ``realtime_probe`` row carrying a fresh
 nonce and reports ``verified`` only when the Postgres Changes event for *that* nonce arrives.
 A merely SUBSCRIBED channel is never reported as success.
 
+Recovery: a channel error, a library re-join or a silently closed socket makes the hub rebuild
+its client and channel (single-flight, backoff 1, 2, 4, 8, 16, 30 s then 30 s), re-prove change
+data capture with the nonce probe, and only then ask every open canvas to resync from the
+database. It never polls: every step is a reaction to a Realtime state change.
+
 Secrets: the Realtime key travels in the WebSocket URL query (``?apikey=``). The client URL
 and the key are never logged, and every stored or logged error is passed through ``_sanitize``.
 """
 
 import asyncio
+import contextlib
 import logging
 import re
 import secrets
@@ -28,6 +34,8 @@ from app.models import CardView
 logger = logging.getLogger(__name__)
 
 CHANNEL_TOPIC = "quadra-db"
+# Delays between recovery attempts; the last value repeats until recovery succeeds or the hub stops.
+RECOVERY_BACKOFF: tuple[float, ...] = (1.0, 2.0, 4.0, 8.0, 16.0, 30.0)
 StartupStage = Literal["connect", "subscribe", "probe-write", "no-event"]
 
 # realtime-py logs the WebSocket URL (with the key in its query) at DEBUG. Hold these at INFO.
@@ -46,6 +54,19 @@ _FIXES = (
 )
 
 
+def _running(task: "asyncio.Task[None] | None") -> bool:
+    return task is not None and not task.done()
+
+
+async def _cancel(task: "asyncio.Task[None] | None") -> None:
+    """Cancel a background task and wait for it to finish."""
+    if task is None or task.done():
+        return
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError, Exception):
+        await task
+
+
 class CardListener(Protocol):
     """An open canvas: receives the cards of its own workspace."""
 
@@ -54,6 +75,8 @@ class CardListener(Protocol):
     def apply_card(self, card: CardView) -> None: ...
 
     def remove_card(self, card_id: str) -> None: ...
+
+    def request_resync(self) -> None: ...
 
 
 class RealtimeCheckError(RuntimeError):
@@ -67,9 +90,9 @@ class RealtimeCheckError(RuntimeError):
 
 class RealtimeHub:
     def __init__(self, supabase_url: str, key: str) -> None:
-        # An https URL is accepted and becomes wss. The key lands in the ?apikey= query.
-        self._rt = AsyncRealtimeClient(f"{supabase_url.rstrip('/')}/realtime/v1", token=key)
-        self._key = key  # kept only to sanitize text
+        self._url = f"{supabase_url.rstrip('/')}/realtime/v1"
+        self._key = key  # kept only to sanitize text and to build clients
+        self._rt = self._new_client()
         self.state: str = "pending"
         self.stage: StartupStage | None = None
         self.error: str | None = None
@@ -77,6 +100,18 @@ class RealtimeHub:
         self._waiters: dict[str, asyncio.Future[float]] = {}
         self._channel: AsyncRealtimeChannel | None = None
         self._listeners: dict[str, set[CardListener]] = {}
+        # Recovery state. _sleep is injectable so tests need no real waiting.
+        self._sleep = asyncio.sleep
+        self._write_probe: Callable[[str], Awaitable[None]] | None = None
+        self._check_timeout: float = 15.0
+        self._stopping = False
+        self._ready: asyncio.Future[None] | None = None
+        self._recovery_task: asyncio.Task[None] | None = None
+        self._resubscribe_task: asyncio.Task[None] | None = None
+
+    def _new_client(self) -> AsyncRealtimeClient:
+        # An https URL is accepted and becomes wss. The key lands in the ?apikey= query.
+        return AsyncRealtimeClient(self._url, token=self._key)
 
     def register(self, listener: CardListener) -> None:
         self._listeners.setdefault(listener.workspace_id, set()).add(listener)
@@ -195,18 +230,11 @@ class RealtimeHub:
             ) from None
 
         ready: asyncio.Future[None] = asyncio.get_running_loop().create_future()
-
-        def on_state(state: RealtimeSubscribeStates, err: Exception | None) -> None:
-            if ready.done():
-                return  # re-join notifications after startup are a Phase 2 concern (resync)
-            if state is RealtimeSubscribeStates.SUBSCRIBED:
-                ready.set_result(None)
-            else:
-                ready.set_exception(RuntimeError(f"{state.value}: {err}"))
+        self._ready = ready
 
         try:
             self._channel = self._build_channel()
-            await self._channel.subscribe(on_state)
+            await self._channel.subscribe(self._on_channel_state)
             await asyncio.wait_for(ready, timeout)
         except TimeoutError:
             raise RealtimeCheckError(
@@ -216,6 +244,118 @@ class RealtimeHub:
             raise RealtimeCheckError(
                 "subscribe", self._sanitize(f"{type(exc).__name__}: {exc}")
             ) from None
+
+    def _on_channel_state(self, state: RealtimeSubscribeStates, err: Exception | None) -> None:
+        """Plain def (realtime-py calls it synchronously): startup readiness, then recovery.
+
+        While ``start()`` waits for the subscription, this resolves it. Afterwards a SUBSCRIBED
+        is a realtime-py re-join (its own reconnect), and CHANNEL_ERROR, TIMED_OUT or CLOSED means
+        the subscription is gone. The error text is never logged or stored here.
+        """
+        if self._ready is not None and not self._ready.done():
+            if state is RealtimeSubscribeStates.SUBSCRIBED:
+                self._ready.set_result(None)
+            else:
+                self._ready.set_exception(RuntimeError(f"{state.value}: {err}"))
+            return
+        if self._stopping:
+            return
+        if state is RealtimeSubscribeStates.SUBSCRIBED:
+            # A running recovery verifies by itself; one re-verification at a time is enough.
+            if _running(self._recovery_task) or _running(self._resubscribe_task):
+                return
+            self._resubscribe_task = asyncio.get_running_loop().create_task(
+                self._after_resubscribe(), name="realtime-reverify"
+            )
+            return
+        self.state = "reconnecting"
+        logger.warning("realtime channel %s; recovering", state.value)
+        self._schedule_recovery()
+
+    def _mark_verified(self, latency_ms: float) -> None:
+        self.state = "verified"
+        self.stage = None
+        self.error = None
+        self.latency_ms = latency_ms
+
+    def _mark_failure(self, exc: Exception) -> StartupStage:
+        """Store a sanitized failure for /healthz without leaving the "reconnecting" state."""
+        if isinstance(exc, RealtimeCheckError):
+            stage, detail = exc.stage, exc.detail
+        else:
+            stage, detail = "connect", type(exc).__name__
+        self.stage = stage
+        self.error = self._sanitize(detail)
+        self.latency_ms = None
+        return stage
+
+    async def _after_resubscribe(self) -> None:
+        """realtime-py re-joined the channel: re-prove change data capture, then resync."""
+        self.state = "reconnecting"
+        try:
+            assert self._write_probe is not None
+            latency_ms = await self.verify_roundtrip(self._write_probe, self._check_timeout)
+        except Exception as exc:
+            stage = self._mark_failure(exc)
+            logger.warning("realtime re-verification failed at stage %s; recovering", stage)
+            self._schedule_recovery()
+            return
+        self._mark_verified(latency_ms)
+        logger.info("Realtime re-verified after re-join: DB change event in %.0f ms", latency_ms)
+        self._resync_listeners()
+
+    def _schedule_recovery(self) -> None:
+        """Single-flight: at most one recovery task, however many failures arrive."""
+        if self._stopping or self._write_probe is None or _running(self._recovery_task):
+            return
+        self._recovery_task = asyncio.get_running_loop().create_task(
+            self._recover(), name="realtime-recovery"
+        )
+
+    async def _close_client(self) -> None:
+        try:
+            await self._rt.close()
+        except Exception as exc:
+            logger.warning("Realtime client close failed: %s", type(exc).__name__)
+
+    async def _recover(self) -> None:
+        """Rebuild client and channel until change data capture is proven, then resync canvases.
+
+        Canvases are asked to resync only after the nonce probe succeeded, so no change can fall
+        between their snapshot read and the first live event.
+        """
+        assert self._write_probe is not None
+        attempt = 0
+        while not self._stopping:
+            self.state = "reconnecting"
+            await _cancel(self._resubscribe_task)
+            await self._close_client()
+            self._rt = self._new_client()
+            try:
+                await self.start(self._check_timeout)
+                latency_ms = await self.verify_roundtrip(self._write_probe, self._check_timeout)
+            except Exception as exc:
+                stage = self._mark_failure(exc)
+                delay = RECOVERY_BACKOFF[min(attempt, len(RECOVERY_BACKOFF) - 1)]
+                attempt += 1
+                logger.warning(
+                    "realtime recovery failed at stage %s; retrying in %.0fs", stage, delay
+                )
+                await self._sleep(delay)
+                continue
+            self._mark_verified(latency_ms)
+            logger.info("Realtime recovered: DB change event received in %.0f ms", latency_ms)
+            self._resync_listeners()
+            return
+
+    def _resync_listeners(self) -> None:
+        """Ask every open canvas to reload from the database; one failing canvas blocks no other."""
+        for workspace in list(self._listeners.values()):
+            for listener in list(workspace):
+                try:
+                    listener.request_resync()
+                except Exception as exc:
+                    logger.warning("canvas resync request failed: %s", type(exc).__name__)
 
     async def verify_roundtrip(
         self,
@@ -234,8 +374,13 @@ class RealtimeHub:
         started = time.monotonic()
         try:
             while True:
+                write_budget = max(timeout - (time.monotonic() - started), 0.001)
                 try:
-                    await write_probe(nonce)
+                    await asyncio.wait_for(write_probe(nonce), write_budget)
+                except TimeoutError:
+                    raise RealtimeCheckError(
+                        "probe-write", f"probe write did not complete within {timeout:.0f}s"
+                    ) from None
                 except Exception as exc:
                     raise RealtimeCheckError(
                         "probe-write", self._sanitize(f"{type(exc).__name__}: {exc}")
@@ -267,6 +412,8 @@ class RealtimeHub:
             self.state = "disabled"
             logger.info("Realtime startup check disabled (REALTIME_CHECK=off)")
             return
+        self._write_probe = write_probe
+        self._check_timeout = timeout
         try:
             await self.start(timeout)
             latency_ms = await self.verify_roundtrip(write_probe, timeout)
@@ -280,21 +427,19 @@ class RealtimeHub:
                 await self.stop()
                 raise failure from None
             logger.error("%s", failure)
+            self._schedule_recovery()  # IN-03: a warn-mode failure heals instead of sticking
             return
         # Only a nonce-matched change event gets here; SUBSCRIBED alone never verifies.
-        self.state = "verified"
-        self.stage = None
-        self.error = None
-        self.latency_ms = latency_ms
+        self._mark_verified(latency_ms)
         logger.info(
             "Realtime startup check verified: DB change event received in %.0f ms", latency_ms
         )
 
     async def stop(self) -> None:
-        try:
-            await self._rt.close()
-        except Exception as exc:
-            logger.warning("Realtime client close failed: %s", type(exc).__name__)
+        self._stopping = True
+        for task in (self._recovery_task, self._resubscribe_task):
+            await _cancel(task)
+        await self._close_client()
 
     def status(self) -> dict[str, Any]:
         return {

@@ -117,8 +117,21 @@ def _failing_start(hub: RealtimeHub, monkeypatch) -> None:
     monkeypatch.setattr(hub, "start", start)
 
 
+class _NoNetworkClient:
+    """A replacement for the rebuilt Realtime client: the warn-mode recovery needs no network."""
+
+    async def close(self) -> None:
+        return None
+
+
 async def test_warn_check_failure_records_failed_without_key(hub, monkeypatch, caplog):
     _failing_start(hub, monkeypatch)
+    monkeypatch.setattr(hub, "_new_client", _NoNetworkClient)
+
+    async def quick_sleep(delay: float) -> None:
+        await asyncio.sleep(0)
+
+    monkeypatch.setattr(hub, "_sleep", quick_sleep)
 
     async def write_probe(nonce: str) -> None:
         raise AssertionError("never reached")
@@ -132,6 +145,7 @@ async def test_warn_check_failure_records_failed_without_key(hub, monkeypatch, c
     errors = [r for r in caplog.records if r.levelno == logging.ERROR]
     assert len(errors) == 1
     assert FAKE_KEY not in caplog.text
+    await hub.stop()  # the recovery scheduled by the warn-mode failure must not outlive the test
 
 
 async def test_strict_check_failure_raises_with_stage_and_fix(hub, monkeypatch):
