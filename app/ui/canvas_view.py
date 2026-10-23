@@ -14,6 +14,7 @@ from nicegui import ui
 
 from app.deps import get_services
 from app.models import QUADRANT_LABELS, CardView, QuadrantView, SessionView, card_sort_key
+from app.services.sessions import CARD_TEXT_ERROR, InvalidCardText, validate_card_text
 from app.ui.identity import ensure_display_name
 
 logger = logging.getLogger(__name__)
@@ -55,7 +56,10 @@ class CanvasView:
                 ui.label("No cards yet").classes("text-grey").mark(f"empty-{quadrant.kind}")
             )
             with ui.row().classes("items-center w-full"):
+                # No browser-side length limit or counter: it counts UTF-16 units and would block
+                # valid 500-code-point emoji text. validate_card_text is the authority.
                 field = ui.input("New card").mark(f"add-input-{quadrant.kind}")
+                field.on_value_change(lambda _, field=field: setattr(field, "error", None))
 
                 async def add(_=None, quadrant=quadrant, field=field) -> None:
                     await self._add_card(quadrant, field)
@@ -64,6 +68,9 @@ class CanvasView:
                 ui.button("Add", on_click=add).mark(f"add-button-{quadrant.kind}")
 
     async def _add_card(self, quadrant: QuadrantView, field: ui.input) -> None:
+        if validate_card_text(field.value) is None:
+            field.error = CARD_TEXT_ERROR
+            return
         # Phase 1 D-02: no placeholder author ever. Cancel keeps the typed text.
         author = await ensure_display_name(on_saved=self._on_name_saved)
         if author is None:
@@ -72,6 +79,9 @@ class CanvasView:
             card = await get_services().sessions.add_card(
                 self.workspace_id, quadrant.id, field.value or "", author
             )
+        except InvalidCardText:
+            field.error = CARD_TEXT_ERROR
+            return
         except Exception as exc:
             logger.warning("add_card failed: %s", type(exc).__name__)
             ui.notify("Could not add the card. Please try again.", type="negative")

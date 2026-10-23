@@ -13,6 +13,10 @@ logger = logging.getLogger(__name__)
 MAX_PROJECT_NAME = 100
 PROJECT_NAME_ERROR = "Required (max 100 characters)"
 
+MAX_CARD_TEXT = 500
+CARD_TEXT_ERROR = "Card text is required (max 500 characters)"
+MAX_AUTHOR = 40
+
 ORDER_GAP = 1024.0  # gapped double-precision ordering (ARCHITECTURE.md), never renumbered
 
 
@@ -39,6 +43,28 @@ def validate_project_name(raw: str | None) -> str | None:
     if not 1 <= len(name) <= MAX_PROJECT_NAME:
         return None
     return name
+
+
+class InvalidCardText(ValueError):
+    """The card text is empty after trimming or longer than MAX_CARD_TEXT."""
+
+
+class InvalidCardAuthor(ValueError):
+    """The card author is empty after trimming or longer than MAX_AUTHOR."""
+
+
+def validate_card_text(raw: str | None) -> str | None:
+    """Return the trimmed card text, or None when invalid.
+
+    Like ``validate_project_name``: trim first, then count Unicode code points (Python ``len``),
+    which is what Postgres ``char_length`` counts on the stored trimmed text.
+    """
+    if raw is None:
+        return None
+    text = raw.strip()
+    if not 1 <= len(text) <= MAX_CARD_TEXT:
+        return None
+    return text
 
 
 class SessionService:
@@ -84,17 +110,22 @@ class SessionService:
     async def add_card(
         self, workspace_id: str, quadrant_id: str, text: str, author: str
     ) -> CardView:
-        """Store a card at the end of its quadrant.
+        """Store a card at the end of its quadrant, after validating text and author.
 
-        Friendly validation lands in 02-02; until then the cards CHECKs are the backstop and any
-        APIError propagates to the caller.
+        Both checks run before any repository call; the stored text and author are trimmed.
         """
+        clean_text = validate_card_text(text)
+        if clean_text is None:
+            raise InvalidCardText(CARD_TEXT_ERROR)
+        clean_author = author.strip()
+        if not 1 <= len(clean_author) <= MAX_AUTHOR:
+            raise InvalidCardAuthor("Author is required (max 40 characters)")
         current_max = await self._repository.max_order_index(quadrant_id)
         row = await self._repository.insert_card(
             workspace_id=workspace_id,
             quadrant_id=quadrant_id,
-            text=text.strip(),
-            author=author,
+            text=clean_text,
+            author=clean_author,
             order_index=next_order_index(current_max),
         )
         return CardView.model_validate(row)
