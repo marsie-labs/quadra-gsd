@@ -108,6 +108,7 @@ class RealtimeHub:
         self._ready: asyncio.Future[None] | None = None
         self._recovery_task: asyncio.Task[None] | None = None
         self._resubscribe_task: asyncio.Task[None] | None = None
+        self._supervisor_task: asyncio.Task[None] | None = None
 
     def _new_client(self) -> AsyncRealtimeClient:
         # An https URL is accepted and becomes wss. The key lands in the ?apikey= query.
@@ -312,6 +313,43 @@ class RealtimeHub:
             self._recover(), name="realtime-recovery"
         )
 
+    def _start_supervisor(self) -> None:
+        """Watch the current client's listen task; at most one supervisor runs at a time."""
+        if self._supervisor_task is not None:
+            self._supervisor_task.cancel()
+        self._supervisor_task = asyncio.get_running_loop().create_task(
+            self._supervise(), name="realtime-supervisor"
+        )
+
+    async def _supervise(self) -> None:
+        """Notice a socket that ended without realtime-py replacing it, and start recovery.
+
+        realtime-py reconnects only after a ConnectionClosedError. A normal close (for example
+        the 24 h cap on secret-key connections) ends its listen task silently and nothing
+        re-joins, so this waits for that task. The wait is event-driven: no sleep loop and no
+        database read.
+
+        This depends on the private ``AsyncRealtimeClient._listen_task`` of realtime 2.33, pinned
+        by uv.lock and guarded by test_listen_task_attribute_exists in tests/unit.
+        """
+        while not self._stopping:
+            task = getattr(self._rt, "_listen_task", None)
+            if task is None:
+                self._schedule_recovery()
+                return
+            await asyncio.wait({task})
+            if task.done() and not task.cancelled():
+                task.exception()  # mark retrieved; its text could carry the connection URL
+            if self._stopping:
+                return
+            current = getattr(self._rt, "_listen_task", None)
+            if current is not None and current is not task and not current.done():
+                continue  # realtime-py reconnected itself; its re-join arrives as SUBSCRIBED
+            logger.warning("realtime connection closed; recovering")
+            self.state = "reconnecting"
+            self._schedule_recovery()
+            return
+
     async def _close_client(self) -> None:
         try:
             await self._rt.close()
@@ -329,6 +367,7 @@ class RealtimeHub:
         while not self._stopping:
             self.state = "reconnecting"
             await _cancel(self._resubscribe_task)
+            await _cancel(self._supervisor_task)  # it watches the client about to be replaced
             await self._close_client()
             self._rt = self._new_client()
             try:
@@ -346,6 +385,7 @@ class RealtimeHub:
             self._mark_verified(latency_ms)
             logger.info("Realtime recovered: DB change event received in %.0f ms", latency_ms)
             self._resync_listeners()
+            self._start_supervisor()
             return
 
     def _resync_listeners(self) -> None:
@@ -434,10 +474,11 @@ class RealtimeHub:
         logger.info(
             "Realtime startup check verified: DB change event received in %.0f ms", latency_ms
         )
+        self._start_supervisor()
 
     async def stop(self) -> None:
         self._stopping = True
-        for task in (self._recovery_task, self._resubscribe_task):
+        for task in (self._supervisor_task, self._recovery_task, self._resubscribe_task):
             await _cancel(task)
         await self._close_client()
 

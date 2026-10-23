@@ -297,7 +297,7 @@ def _live_supervisors() -> list[asyncio.Task]:
 
 
 def test_listen_task_attribute_exists():
-    """The supervisor reads the private realtime 2.33 ``_listen_task``; an upgrade must not hide it."""
+    """Pins the private realtime 2.33 ``_listen_task`` the supervisor reads."""
     from realtime import AsyncRealtimeClient
 
     client = AsyncRealtimeClient("https://example.supabase.co/realtime/v1", token="x")
