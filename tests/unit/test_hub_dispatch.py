@@ -278,6 +278,18 @@ def test_delete_event_removes_by_old_record(hub):
     assert w1.applied == []
 
 
+def test_delete_with_only_the_primary_key_removes_from_every_canvas(hub):
+    """Hosted RLS sends old_record = {"id": ...} only (measured against the hosted project)."""
+    w1, w2 = RecordingListener("W1"), RecordingListener("W2")
+    hub.register(w1)
+    hub.register(w2)
+
+    _deliver_card(hub, "DELETE", {}, old_record={"id": "gone"})
+
+    assert w1.removed == ["gone"]
+    assert w2.removed == ["gone"]
+
+
 def test_update_across_workspaces_removes_from_old_session(hub):
     w1, w2 = RecordingListener("W1"), RecordingListener("W2")
     hub.register(w1)
@@ -325,7 +337,7 @@ def test_malformed_event_is_dropped_without_payload_in_logs(hub, caplog):
         hub._on_card({"data": {"type": "INSERT", "record": bad, "old_record": {}}})
         hub._on_card({"data": {"type": "BOGUS", "record": _row("W1"), "old_record": {}}})
         hub._on_card("not even a dict")
-        hub._on_card({"data": {"type": "DELETE", "record": {}, "old_record": {"id": "x"}}})
+        hub._on_card({"data": {"type": "DELETE", "record": {}, "old_record": {}}})
 
     assert "PAYLOAD-MARKER-123" not in caplog.text
     assert listener.applied == [] and listener.removed == []

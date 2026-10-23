@@ -123,7 +123,7 @@ class RealtimeHub:
 
         INSERT/UPDATE apply the row to its workspace's canvases (an UPDATE that changes
         workspace first removes the card from the old workspace's canvases). DELETE carries only
-        ``old_record`` (replica identity full) and removes the card. Never raises and never logs
+        ``old_record`` (at least the card id) and removes the card. Never raises and never logs
         the payload: a malformed event costs one warning naming the event type and exception class.
         """
         event_type = "unknown"
@@ -134,8 +134,17 @@ class RealtimeHub:
             if raw_type == "DELETE":
                 event_type = raw_type
                 old = data["old_record"]
-                card_id, workspace_id = str(old["id"]), str(old["workspace_id"])
-                self._fan_out(workspace_id, lambda listener: listener.remove_card(card_id))
+                card_id = str(old["id"])
+                workspace_id = old.get("workspace_id")
+                if workspace_id is not None:
+                    self._fan_out(str(workspace_id), lambda listener: listener.remove_card(card_id))
+                else:
+                    # Hosted Postgres Changes sends only the primary key in a DELETE's old_record
+                    # when RLS is on, even with replica identity full (measured in 02-03). Card
+                    # ids are globally unique and removal of an unknown id is a no-op, so tell
+                    # every open canvas: it can only ever drop a card it already shows.
+                    for workspace in list(self._listeners):
+                        self._fan_out(workspace, lambda listener: listener.remove_card(card_id))
                 return
             if raw_type not in ("INSERT", "UPDATE"):
                 raise ValueError("unknown event type")

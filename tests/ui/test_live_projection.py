@@ -103,6 +103,18 @@ async def test_soft_delete_and_hard_delete_remove_card(user, create_user):
     }
 
 
+async def test_delete_with_only_the_card_id_removes_it(user):
+    repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
+    row = seed_card(repo, SEEDED_ID_A, "IS", "primary key only")
+    await user.open(PATH_A)
+
+    get_services().hub._on_card(card_event({}, "DELETE", old={"id": row["id"]}))
+
+    assert _card_texts(user, "IS") == []
+    with user.scope(marker="quadrant-IS"):
+        await user.should_see(EMPTY)
+
+
 async def test_deleting_the_last_card_brings_the_hint_back(user):
     repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
     row = seed_card(repo, SEEDED_ID_A, "IS", "only one")
