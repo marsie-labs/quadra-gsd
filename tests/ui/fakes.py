@@ -210,6 +210,38 @@ class FakeRepository:
         )
         return dict(self.cards[card_id])
 
+    async def get_card(self, *, workspace_id: str, card_id: str) -> dict[str, Any] | None:
+        """One live card of this workspace, or None (unknown, foreign or deleted)."""
+        row = self.cards.get(card_id)
+        if row is None or row["workspace_id"] != workspace_id or row["deleted_at"] is not None:
+            return None
+        return dict(row)
+
+    async def list_quadrant_order(self, quadrant_id: str) -> list[dict[str, Any]]:
+        """id, order_index and created_at of a quadrant's live cards in display order."""
+        rows = [
+            {k: c[k] for k in ("id", "order_index", "created_at")}
+            for c in self.cards.values()
+            if c["quadrant_id"] == quadrant_id and c["deleted_at"] is None
+        ]
+        return sorted(rows, key=lambda c: (c["order_index"], c["created_at"], c["id"]))
+
+    async def set_card_order(
+        self, *, workspace_id: str, card_id: str, order_index: float
+    ) -> dict[str, Any] | None:
+        """Change only a live card's order_index; None when no such live card matches."""
+        self.update_calls += 1
+        if self.update_gate is not None:
+            await self.update_gate.wait()
+        if self.fail_next_update_codes:
+            code = self.fail_next_update_codes.pop(0)
+            raise APIError({"code": code, "message": "injected"})
+        row = self.cards.get(card_id)
+        if row is None or row["workspace_id"] != workspace_id or row["deleted_at"] is not None:
+            return None
+        self.cards[card_id] = self._touch(row, {"order_index": order_index})
+        return dict(self.cards[card_id])
+
     async def list_cards(self, workspace_id: str) -> list[dict[str, Any]]:
         """Live cards of a workspace in (order_index, created_at, id) order."""
         self.list_calls += 1

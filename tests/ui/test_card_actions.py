@@ -366,14 +366,20 @@ async def test_move_card_that_is_deleted_or_unknown_raises_card_gone():
 # ---------------------------------------------------------------- move: in the browser
 
 
-async def test_menu_holds_edit_then_move_to_then_delete(user):
+async def test_menu_holds_edit_then_move_to_then_the_reorder_items_then_delete(user):
     repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
     row = seed_card(repo, SEEDED_ID_A, "IS", "alpha")
     await user.open(PATH_A)
 
     items = _menu_items(user, row["id"])
 
-    assert [_item_text(item) for item in items] == ["Edit", "Move to", "Delete"]
+    assert [_item_text(item) for item in items] == [
+        "Edit",
+        "Move to",
+        "Move up",
+        "Move down",
+        "Delete",
+    ]
     assert "card-action-move" in items[1]._markers
 
 
