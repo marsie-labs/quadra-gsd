@@ -106,6 +106,15 @@ class FakeRepository:
         self.cards[row["id"]] = row
         return dict(row)
 
+    async def list_cards(self, workspace_id: str) -> list[dict[str, Any]]:
+        """Live cards of a workspace in (order_index, created_at, id) order."""
+        rows = [
+            dict(c)
+            for c in self.cards.values()
+            if c["workspace_id"] == workspace_id and c["deleted_at"] is None
+        ]
+        return sorted(rows, key=lambda c: (c["order_index"], c["created_at"], c["id"]))
+
     async def max_order_index(self, quadrant_id: str) -> float | None:
         values = [
             c["order_index"]
@@ -133,3 +142,50 @@ def install_fake_services(seed: dict[str, str] | None = None) -> FakeRepository:
     hub = RealtimeHub("https://example.supabase.co", "sb_secret_FAKE_FOR_UI_TESTS")
     app.deps.services = Services(sessions=SessionService(repo), hub=hub)  # type: ignore[arg-type]
     return repo
+
+
+def seed_card(
+    repo: FakeRepository,
+    session_id: str,
+    kind: str,
+    text: str,
+    author: str = "Ann",
+    order_index: float = 1024.0,
+    created_at: str | None = None,
+    deleted_at: str | None = None,
+) -> dict[str, Any]:
+    """Store a card straight into the fake (no service, no event) and return a copy of its row."""
+    workspace = repo.rows[session_id]
+    quadrant = next(q for q in workspace["quadrants"] if q["kind"] == kind)
+    moment = created_at or datetime.now(UTC).isoformat()
+    row = {
+        "id": str(uuid.uuid4()),
+        "workspace_id": workspace["id"],
+        "quadrant_id": quadrant["id"],
+        "text": text,
+        "order_index": order_index,
+        "author": author,
+        "created_at": moment,
+        "updated_at": moment,
+        "deleted_at": deleted_at,
+    }
+    repo.cards[row["id"]] = row
+    return dict(row)
+
+
+def card_event(
+    row: dict[str, Any], event_type: str = "INSERT", old: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """A Realtime postgres_changes payload for the cards table, as the hub callback receives it."""
+    return {
+        "ids": [],
+        "data": {
+            "schema": "public",
+            "table": "cards",
+            "type": event_type,
+            "commit_timestamp": datetime.now(UTC).isoformat(),
+            "errors": None,
+            "record": row or {},
+            "old_record": old or {},
+        },
+    }
