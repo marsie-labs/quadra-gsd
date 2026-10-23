@@ -167,3 +167,200 @@ async def test_subscribed_alone_never_verifies(hub, monkeypatch):
 
 def test_status_has_exactly_four_keys(hub):
     assert set(hub.status()) == {"state", "stage", "latency_ms", "error"}
+
+
+# --- cards fan-out (02-03): INSERT / UPDATE / DELETE routing through the real channel ---
+
+
+class RecordingListener:
+    """A CardListener that records what the hub hands it."""
+
+    def __init__(self, workspace_id: str, fail: bool = False) -> None:
+        self.workspace_id = workspace_id
+        self.fail = fail
+        self.applied: list = []
+        self.removed: list[str] = []
+
+    def apply_card(self, card) -> None:
+        if self.fail:
+            raise RuntimeError("boom")
+        self.applied.append(card)
+
+    def remove_card(self, card_id: str) -> None:
+        self.removed.append(card_id)
+
+
+def _row(workspace_id: str = "W1", card_id: str = "c1", **overrides) -> dict:
+    row = {
+        "id": card_id,
+        "workspace_id": workspace_id,
+        "quadrant_id": "q1",
+        "text": "hello",
+        "author": "Ann",
+        "order_index": 1024.0,
+        "created_at": "2026-10-23T10:00:00+00:00",
+        "updated_at": "2026-10-23T10:00:00+00:00",
+        "deleted_at": None,
+    }
+    row.update(overrides)
+    return row
+
+
+def _card_message(
+    topic: str,
+    event_type: str,
+    record: dict,
+    old_record: dict | None = None,
+    binding_id: int = 8,
+) -> dict:
+    return {
+        "topic": topic,
+        "event": "postgres_changes",
+        "ref": None,
+        "payload": {
+            "ids": [binding_id],
+            "data": {
+                "schema": "public",
+                "table": "cards",
+                "commit_timestamp": "2026-10-23T10:00:00Z",
+                "type": event_type,
+                "errors": None,
+                "columns": [{"name": "id", "type": "uuid"}],
+                "record": record,
+                "old_record": old_record or {},
+            },
+        },
+    }
+
+
+def _deliver_card(hub: RealtimeHub, event_type: str, record: dict, old_record=None) -> None:
+    """Feed a cards message through the real channel with the server-assigned binding ids."""
+    ch = hub._build_channel()
+    ch.postgres_changes_callbacks[0].id = 7
+    ch.postgres_changes_callbacks[1].id = 8
+    msg = _card_message(ch.topic, event_type, record, old_record)
+    ch._handle_message(ServerMessageAdapter.validate_json(json.dumps(msg)))
+
+
+async def test_cards_message_reaches_on_card_through_channel(hub):
+    waiter = hub._register_waiter("abc")
+    w1, w2 = RecordingListener("W1"), RecordingListener("W2")
+    hub.register(w1)
+    hub.register(w2)
+
+    _deliver_card(hub, "INSERT", _row("W1"))
+
+    assert [c.id for c in w1.applied] == ["c1"]
+    assert w2.applied == []
+    assert not waiter.done()  # the probe waiter is untouched by a cards message
+
+
+async def test_probe_message_does_not_reach_card_listeners(hub):
+    listener = RecordingListener("W1")
+    hub.register(listener)
+    waiter = hub._register_waiter("abc")
+
+    _deliver(hub, "abc")
+
+    assert waiter.done()
+    assert listener.applied == [] and listener.removed == []
+
+
+def test_delete_event_removes_by_old_record(hub):
+    w1, w2 = RecordingListener("W1"), RecordingListener("W2")
+    hub.register(w1)
+    hub.register(w2)
+
+    _deliver_card(hub, "DELETE", {}, old_record=_row("W1", "gone"))
+
+    assert w1.removed == ["gone"]
+    assert w2.removed == []
+    assert w1.applied == []
+
+
+def test_update_across_workspaces_removes_from_old_session(hub):
+    w1, w2 = RecordingListener("W1"), RecordingListener("W2")
+    hub.register(w1)
+    hub.register(w2)
+
+    _deliver_card(hub, "UPDATE", _row("W2"), old_record=_row("W1"))
+
+    assert w1.removed == ["c1"]
+    assert w1.applied == []
+    assert [c.id for c in w2.applied] == ["c1"]
+    assert w2.removed == []
+
+
+def test_update_inside_one_workspace_does_not_remove(hub):
+    w1 = RecordingListener("W1")
+    hub.register(w1)
+
+    _deliver_card(hub, "UPDATE", _row("W1", text="new"), old_record={"id": "c1"})
+
+    assert w1.removed == []
+    assert [c.text for c in w1.applied] == ["new"]
+
+
+def test_failing_listener_does_not_block_others(hub, caplog):
+    bad, good = RecordingListener("W1", fail=True), RecordingListener("W1")
+    hub.register(bad)
+    hub.register(good)
+
+    with caplog.at_level(logging.INFO):
+        hub._on_card({"data": {"type": "INSERT", "record": _row("W1"), "old_record": {}}})
+
+    assert [c.id for c in good.applied] == ["c1"]
+    levels = [r.levelno for r in caplog.records]
+    assert levels.count(logging.WARNING) == 1
+    assert logging.ERROR not in levels
+
+
+def test_malformed_event_is_dropped_without_payload_in_logs(hub, caplog):
+    listener = RecordingListener("W1")
+    hub.register(listener)
+    bad = _row("W1", text="PAYLOAD-MARKER-123")
+    del bad["order_index"]
+
+    with caplog.at_level(logging.INFO):
+        hub._on_card({"data": {"type": "INSERT", "record": bad, "old_record": {}}})
+        hub._on_card({"data": {"type": "BOGUS", "record": _row("W1"), "old_record": {}}})
+        hub._on_card("not even a dict")
+        hub._on_card({"data": {"type": "DELETE", "record": {}, "old_record": {"id": "x"}}})
+
+    assert "PAYLOAD-MARKER-123" not in caplog.text
+    assert listener.applied == [] and listener.removed == []
+    assert [r.levelno for r in caplog.records].count(logging.WARNING) == 4
+    assert logging.ERROR not in [r.levelno for r in caplog.records]
+
+    hub._on_card({"data": {"type": "INSERT", "record": _row("W1", card_id="ok"), "old_record": {}}})
+    assert [c.id for c in listener.applied] == ["ok"]
+
+
+def test_register_unregister_idempotent(hub):
+    a, b = RecordingListener("W1"), RecordingListener("W2")
+    hub.register(a)
+    hub.register(a)
+    hub.register(b)
+    assert hub.listener_count("W1") == 1
+    assert hub.listener_count() == 2
+
+    hub.unregister(a)
+    hub.unregister(a)
+    assert hub.listener_count("W1") == 0
+    assert hub.listener_count() == 1
+
+
+def test_listener_unregistering_during_dispatch_is_safe(hub):
+    class Leaver(RecordingListener):
+        def apply_card(self, card) -> None:
+            hub.unregister(self)
+            super().apply_card(card)
+
+    leaver, stayer = Leaver("W1"), RecordingListener("W1")
+    hub.register(leaver)
+    hub.register(stayer)
+
+    _deliver_card(hub, "INSERT", _row("W1"))
+
+    assert len(leaver.applied) == 1
+    assert len(stayer.applied) == 1
