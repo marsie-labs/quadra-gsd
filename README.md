@@ -4,7 +4,7 @@ Quadra is a realtime collaborative boundary canvas. A small team opens a shared 
 
 It is Python end to end: FastAPI and NiceGUI for the server and UI, Supabase PostgreSQL for persistence, and Supabase Realtime events relayed by the Python server.
 
-This README covers Phase 1 (session skeleton): create a session, open its unguessable link, enter a display name and see the four labeled quadrants, with the schema and the Realtime connection proven at startup.
+This README covers Phases 1 and 2. Phase 1 is the session skeleton: create a session, open its unguessable link, enter a display name and see the four labeled quadrants, with the schema and the Realtime connection proven at startup. Phase 2 is the live shared canvas: add cards to any quadrant and watch every open browser update live, with the server recovering by itself from Realtime and connection loss.
 
 ## Prerequisites
 
@@ -48,10 +48,18 @@ supabase migration list --linked      # Local and Remote columns should match
 
 If the CLI asks for the database password, export `SUPABASE_DB_PASSWORD` in your shell for that command only. It never belongs in `.env`.
 
-Fallback when the CLI cannot reach the project: paste `supabase/migrations/20261022000000_init_schema.sql` into the Dashboard SQL editor and run it, then record it as applied so the CLI stays in sync:
+The migrations, applied in order:
+
+| Version | File | What it adds |
+|---------|------|--------------|
+| `20261022000000` | `supabase/migrations/20261022000000_init_schema.sql` | Sessions, quadrants, cards, the probe table, RLS and the Realtime publication. |
+| `20261023000000` | `supabase/migrations/20261023000000_author_nonblank.sql` | Database checks that a card's author (and a closing name) is not blank and at most 40 characters. |
+
+Fallback when the CLI cannot reach the project: paste each migration file, in version order, into the Dashboard SQL editor and run it, then record each one as applied so the CLI stays in sync:
 
 ```bash
 supabase migration repair --status applied 20261022000000 --linked
+supabase migration repair --status applied 20261023000000 --linked
 ```
 
 ## Run
@@ -79,7 +87,7 @@ Realtime startup check verified: DB change event received in 348 ms
 | Value | On failure | `/healthz` realtime state |
 |-------|------------|---------------------------|
 | `strict` (default) | Startup stops with a message naming the failed stage and the likely fix. | the app does not start |
-| `warn` | One ERROR is logged and the app starts anyway. | `failed` |
+| `warn` | One ERROR is logged and the app starts anyway. The hub keeps recovering in the background. | `failed`, then `reconnecting`, then `verified` once Realtime is reachable |
 | `off` | The check is skipped and nothing connects at startup. | `disabled` |
 
 The four failure stages:
@@ -99,13 +107,50 @@ A strict failure takes about 15 seconds to surface when the key is rejected, bec
 {"status": "ok", "realtime": {"state": "verified", "stage": null, "latency_ms": 348.05, "error": null}}
 ```
 
-`realtime.state` is one of `pending` (no check has run), `verified`, `failed` or `disabled`. `status` is `ok` when the state is `verified` or `disabled`, otherwise `degraded`.
+`realtime.state` is one of `pending` (no check has run), `verified`, `failed`, `reconnecting` (the hub is recovering, see [Reconnects and restarts](#reconnects-and-restarts)) or `disabled`. `status` is `ok` when the state is `verified` or `disabled`, otherwise `degraded`.
 
 ## Realtime key
 
 Outcome of the live run on this project (2026-10-22): hosted Supabase Realtime **accepts the `sb_secret_` key** (`SUPABASE_SECRET_KEY`). `SUPABASE_REALTIME_KEY` was not set and the legacy JWT was not needed. The probe event round trip took roughly 0.35 to 1.3 seconds across runs.
 
 So `SUPABASE_REALTIME_KEY` is an optional override. Set it only if the startup check fails at stage `connect` with HTTP 401/403, for example on a project whose Realtime still requires a legacy JWT. A deliberately wrong key was also tried: it fails loudly at stage `connect` with HTTP 401, and the key text does not appear in the error or the console.
+
+## Live cards
+
+Each quadrant has an add field. The first time someone adds a card in a browser, the page asks for a display name; the name is stored in that browser and reused afterwards. Card text is 1 to 500 characters (it is trimmed first). A card shows "author · HH:MM", where the time is in the server's local time zone; hover it for the full timestamp.
+
+## Live updates
+
+Every change reaches open browsers only through Supabase Realtime events relayed by the Python server. There is no polling and no timer-driven refresh: the server holds one Realtime subscription and fans each event out to the canvases of the session it belongs to.
+
+Changes made outside the app appear live too. To see it, open a session in a browser, then run these statements in the Supabase Dashboard SQL editor (replace `<session_id>` with the id from the session link):
+
+```sql
+-- add a card to IS
+insert into public.cards (workspace_id, quadrant_id, text, order_index, author)
+select w.id, q.id, 'Hello from SQL', 1000000, 'SQL editor'
+from public.workspaces w
+join public.quadrants q on q.workspace_id = w.id and q.kind = 'IS'
+where w.session_id = '<session_id>';
+
+-- edit it
+update public.cards set text = 'Edited in SQL' where text = 'Hello from SQL';
+
+-- soft-delete it
+update public.cards set deleted_at = now() where text = 'Edited in SQL';
+```
+
+The card appears, changes text and then disappears in every open browser without a reload.
+
+With `REALTIME_CHECK=off` the server never connects to Realtime, so there are **no live updates at all**: a browser sees only what the database held when its page opened or reconnected. Use it for tests only.
+
+## Reconnects and restarts
+
+- **Browser reconnect.** When a browser loses its connection and comes back, its canvas reloads the cards from the database, so nothing written meanwhile is missed.
+- **Server restart.** A restarted server reads the current cards from the database when a page opens; cards added while it was down are there.
+- **Realtime recovery.** If the server's Realtime connection drops, the hub rebuilds it by itself. A channel error, a timeout, a re-join by the client library and a silently closed socket (for example the 24 hour limit on secret-key connections) are all handled. Attempts are spaced 1, 2, 4, 8, 16 and then 30 seconds apart until one works. The hub then proves again that database change events reach it (the same nonce probe as at startup), and only then asks every open canvas to reload its cards from the database, so no change can fall between the reload and the first live event. Cards are re-read only in response to such a loss, never on a timer.
+- **Health.** While the hub recovers, `/healthz` reports realtime state `reconnecting` and status `degraded`; afterwards it reports `verified` again. A warn-mode startup failure no longer sticks: the hub keeps recovering and reports `verified` once Realtime is reachable.
+- If the database itself cannot be read when a page opens, the page answers 503 "Temporarily unavailable" instead of "Session not found".
 
 ## Tests
 
@@ -115,7 +160,7 @@ uv run pytest -m integration -q -rs    # hosted Supabase; needs .env
 uv run ruff check . && uv run ruff format --check .
 ```
 
-The integration suite needs `.env` with `SUPABASE_URL`, `SUPABASE_SECRET_KEY` and `STORAGE_SECRET`, plus `SUPABASE_PUBLISHABLE_KEY` for the anonymous-denial test (without it that test is reported as skipped). It includes a test that starts the real server as a subprocess, waits for `/healthz` to report `verified`, checks the one-year session cookie and asserts that no key appears in the console output.
+The integration suite needs `.env` with `SUPABASE_URL`, `SUPABASE_SECRET_KEY` and `STORAGE_SECRET`, plus `SUPABASE_PUBLISHABLE_KEY` for the anonymous-denial test (without it that test is reported as skipped). It includes tests that start the real server as a subprocess, wait for `/healthz` to report `verified`, check the one-year session cookie and assert that no key appears in the console output (`test_realtime_probe.py`), restart the server and find a card written while it was down (`test_restart_recovery.py`), prove live fan-out and convergence (`test_live_cards.py`), and close the hub's Realtime socket and check that it recovers and the canvases pick up a card written during the outage (`test_realtime_recovery.py`).
 
 ## Project layout
 
@@ -129,13 +174,13 @@ app/
   tokens.py            unguessable session link tokens
   db/repository.py     the only module that talks PostgREST
   services/sessions.py session creation and lookup, name and id validation
-  realtime/hub.py      Realtime hub and startup round-trip check
-  ui/                  NiceGUI pages: home, canvas, page registration
+  realtime/hub.py      Realtime hub: startup round-trip check, fan-out, recovery
+  ui/                  NiceGUI pages: home, canvas page, canvas_view.py (live card projection), page registration
 supabase/
   config.toml
   migrations/          SQL schema, pushed with the Supabase CLI
 tests/
-  unit/                settings, tokens, sessions service, hub, launcher and /healthz
+  unit/                settings, tokens, sessions service, hub (dispatch, recovery), launcher and /healthz
   ui/                  NiceGUI user-fixture tests
-  integration/         hosted-Supabase tests
+  integration/         hosted-Supabase tests (probe, live cards, restart and Realtime recovery)
 ```
