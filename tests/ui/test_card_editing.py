@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from nicegui import ui
+from nicegui.testing.user_notify import UserNotify
 from postgrest.exceptions import APIError
 
 from app.deps import get_services
@@ -32,6 +33,12 @@ PATH_A = f"/s/{SEEDED_ID_A}"
 ENTER = "keydown.enter.exact.prevent"
 
 
+def test_user_facing_messages_are_pinned():
+    assert EDIT_FAILED == "Could not save the card. Please try again."
+    assert CARD_GONE == "This card was deleted."
+    assert CARD_TEXT_ERROR == "Card text is required (max 500 characters)"
+
+
 def _card_texts(browser, kind: str) -> list[str]:
     """Texts of the card widgets inside a quadrant's card column, in child order."""
     column = next(iter(browser.find(marker=f"cards-{kind}").elements))
@@ -44,7 +51,22 @@ def _card_element(browser, card_id: str) -> ui.card:
 
 
 def _card_count(browser) -> int:
-    return len(browser.find(marker="card").elements)
+    """Card elements shown in all four quadrants (``find`` raises when there are none)."""
+    columns = [
+        next(iter(browser.find(marker=f"cards-{kind}").elements))
+        for kind in ("IS", "IS_NOT", "DOES", "DOES_NOT")
+    ]
+    return sum(len(column.default_slot.children) for column in columns)
+
+
+async def _wait_for(predicate, retries: int = 100) -> None:
+    """Let the event loop run until ``predicate()`` holds. ``should_see`` would also match the
+    textarea's own value, so it cannot tell a saved edit from a typed one."""
+    for _ in range(retries):
+        if predicate():
+            return
+        await asyncio.sleep(0.02)
+    raise AssertionError("condition not reached")
 
 
 def _meta(browser, card_id: str) -> str:
@@ -64,6 +86,18 @@ def _editor(browser) -> ui.textarea:
 def _type_and_enter(browser, text: str) -> None:
     browser.find(marker="card-editor").clear().type(text)
     browser.find(marker="card-editor").trigger(ENTER)
+
+
+class _TypedNotify(UserNotify):
+    """The simulated user's notify, also remembering each message's notification type."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.typed: list[tuple[str, str | None]] = []
+
+    def __call__(self, message: str, **kwargs) -> None:
+        self.typed.append((message, kwargs.get("type")))
+        super().__call__(message, **kwargs)
 
 
 def _iso(moment: datetime) -> str:
@@ -236,9 +270,9 @@ async def test_enter_saves_new_text_with_edited_marker_and_keeps_author(user):
     assert _editor(user).value == "old text"
     _type_and_enter(user, "new text")
 
-    with user.scope(marker="cards-IS"):
-        await user.should_see("new text", retries=50)
+    await _wait_for(lambda: repo.cards[row["id"]]["text"] == "new text")
     await user.should_not_see(marker="card-editor")
+    assert _card_texts(user, "IS") == ["new text"]
     assert _meta(user, row["id"]).endswith("(edited)")
     assert repo.update_calls == 1
     assert repo.cards[row["id"]]["text"] == "new text"
@@ -255,10 +289,9 @@ async def test_own_edit_shows_before_the_write_returns_and_is_never_rebuilt(user
 
     _open_editor(user, row["id"])
     _type_and_enter(user, "new text")
-    with user.scope(marker="cards-IS"):
-        await user.should_see("new text", retries=50)
+    await _wait_for(lambda: repo.update_calls == 1)
     # The write is held: what is shown is the optimistic row.
-    assert repo.update_calls == 1
+    assert _card_texts(user, "IS") == ["new text"]
     assert repo.cards[row["id"]]["text"] == "old text"
     assert _meta(user, row["id"]).endswith("(edited)")
 
@@ -272,13 +305,8 @@ async def test_own_edit_shows_before_the_write_returns_and_is_never_rebuilt(user
     assert _meta(user, row["id"]).endswith("(edited)")
 
     repo.update_gate.set()
-    with user.scope(marker="cards-IS"):
-        await user.should_see("new text", retries=50)
-    for _ in range(50):
-        if repo.cards[row["id"]]["text"] == "new text":
-            break
-        await asyncio.sleep(0.02)
-    await asyncio.sleep(0.1)
+    await _wait_for(lambda: repo.cards[row["id"]]["text"] == "new text")
+    await asyncio.sleep(0.1)  # let the confirmed row reach the page
 
     confirmed = dict(repo.cards[row["id"]])
     hub._on_card(card_event(confirmed, "UPDATE", old=row))  # the Realtime echo of our own write
@@ -294,19 +322,22 @@ async def test_failed_edit_rolls_back_with_a_message_and_stays_editable(user):
     row = seed_card(repo, SEEDED_ID_A, "IS", "old text")
     repo.fail_next_update_codes = ["XX000"]
     await user.open(PATH_A)
+    user.notify = notifications = _TypedNotify()
 
     _open_editor(user, row["id"])
     _type_and_enter(user, "new text")
 
     await user.should_see(EDIT_FAILED)
+    assert (EDIT_FAILED, "negative") in notifications.typed
+    await user.should_not_see(marker="card-editor")
     assert _card_texts(user, "IS") == ["old text"]
     assert "(edited)" not in _meta(user, row["id"])
     assert _card_count(user) == 1
 
     _open_editor(user, row["id"])
     _type_and_enter(user, "second try")
-    with user.scope(marker="cards-IS"):
-        await user.should_see("second try", retries=50)
+    await _wait_for(lambda: repo.update_calls == 2)
+    await _wait_for(lambda: repo.cards[row["id"]]["text"] == "second try")
     assert repo.update_calls == 2
     assert repo.cards[row["id"]]["text"] == "second try"
 
@@ -335,35 +366,26 @@ async def test_edit_of_500_code_points_saves(user):
     _open_editor(user, row["id"])
     _type_and_enter(user, "é" * 500)
 
-    for _ in range(50):
-        if repo.update_calls:
-            break
-        await asyncio.sleep(0.02)
-    assert repo.update_calls == 1
+    await _wait_for(lambda: repo.update_calls == 1)
     assert repo.cards[row["id"]]["text"] == "é" * 500
     await user.should_not_see(marker="card-editor")
 
 
-async def test_edit_of_a_card_deleted_meanwhile_drops_it_with_a_warning(user, monkeypatch):
+async def test_edit_of_a_card_deleted_meanwhile_drops_it_with_a_warning(user):
     repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
     row = seed_card(repo, SEEDED_ID_A, "IS", "doomed")
     await user.open(PATH_A)
-    notifications: list[tuple[str, str | None]] = []
-    original = ui.notify
-
-    def record(message, **kwargs):
-        notifications.append((message, kwargs.get("type")))
-        return original(message, **kwargs)
-
-    monkeypatch.setattr(ui, "notify", record)
+    user.notify = notifications = _TypedNotify()
 
     _open_editor(user, row["id"])
     soft_delete_card(repo, row["id"])  # deleted elsewhere, no event reached this page
     _type_and_enter(user, "too late")
 
+    await _wait_for(lambda: repo.update_calls == 1)
     await user.should_see(CARD_GONE)
+    assert repo.cards[row["id"]]["text"] == "doomed"
     assert _card_count(user) == 0
-    assert (CARD_GONE, "warning") in notifications
+    assert (CARD_GONE, "warning") in notifications.typed
     with user.scope(marker="quadrant-IS"):
         await user.should_see("No cards yet")
 
@@ -409,13 +431,8 @@ async def test_editing_by_id_leaves_a_card_with_identical_text_alone(user):
 
     _open_editor(user, second["id"])
     _type_and_enter(user, "changed")
-    with user.scope(marker="cards-IS"):
-        await user.should_see("changed", retries=50)
-    for _ in range(50):
-        if repo.cards[second["id"]]["text"] == "changed":
-            break
-        await asyncio.sleep(0.02)
-    await asyncio.sleep(0.1)
+    await _wait_for(lambda: repo.cards[second["id"]]["text"] == "changed")
+    await asyncio.sleep(0.1)  # let the confirmed row reach the page
     hub._on_card(card_event(dict(repo.cards[second["id"]]), "UPDATE", old=second))
 
     assert _card_texts(user, "IS") == ["same", "changed"]
@@ -432,8 +449,8 @@ async def test_edited_markup_is_shown_literally(user):
     _open_editor(user, row["id"])
     _type_and_enter(user, "<b>x</b>")
 
-    with user.scope(marker="cards-IS"):
-        await user.should_see("<b>x</b>", retries=50)
+    await _wait_for(lambda: repo.cards[row["id"]]["text"] == "<b>x</b>")
+    await user.should_not_see(marker="card-editor")
     with user.scope(marker=f"card-{row['id']}"):
         text = next(iter(user.find(marker="card-text").elements))
     assert isinstance(text, ui.label)

@@ -29,7 +29,7 @@ from nicegui import background_tasks, ui
 
 from app.deps import get_services
 from app.models import QUADRANT_LABELS, CardView, QuadrantView, SessionView, card_sort_key
-from app.services.sessions import CARD_TEXT_ERROR, InvalidCardText, validate_card_text
+from app.services.sessions import CARD_TEXT_ERROR, CardGone, InvalidCardText, validate_card_text
 from app.ui.identity import ensure_display_name
 
 logger = logging.getLogger(__name__)
@@ -298,6 +298,11 @@ class CanvasView:
             self._render(card_id)
             try:
                 row = await call()
+            except CardGone:
+                # Deleted meanwhile (here or elsewhere): the removal stands, the card never returns.
+                self._remove(card_id)
+                self._notify(CARD_GONE)
+                return
             except Exception as exc:
                 logger.warning("%s failed: %s", operation, type(exc).__name__)
                 self._optimistic.pop(card_id, None)
@@ -439,11 +444,11 @@ class CanvasView:
     def _gone(self) -> bool:
         return self._root is None or self._root.is_deleted
 
-    def _notify(self, message: str) -> None:
+    def _notify(self, message: str, type: str = "warning") -> None:
         """``ui.notify`` needs a client context; a background resync runs outside any handler."""
         assert self._root is not None
         with self._root:
-            ui.notify(message, type="warning")
+            ui.notify(message, type=type)
 
     def request_resync(self) -> None:
         """Schedule ``resync()`` in the background. Plain def: callable from sync event code."""

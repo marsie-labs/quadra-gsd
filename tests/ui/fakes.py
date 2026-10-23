@@ -6,7 +6,7 @@ validation, retry and pre-filter logic under test is production code; only Postg
 
 import asyncio
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from postgrest.exceptions import APIError
@@ -33,6 +33,8 @@ class FakeRepository:
     ``fail_next_*_codes`` lists make the next call raise an ``APIError`` with that code.
     ``list_gate`` holds a card read AFTER its rows are computed, so a held read returns a
     snapshot older than whatever happens meanwhile; ``list_calls`` counts card reads.
+    ``update_gate``/``update_calls``/``fail_next_update_codes`` do the same for a card update,
+    whose row changes go through ``_touch``, the stand-in for the ``cards_touch`` trigger.
     """
 
     def __init__(self) -> None:
@@ -45,6 +47,9 @@ class FakeRepository:
         self.insert_calls = 0
         self.insert_gate: asyncio.Event | None = None
         self.fail_next_insert_codes: list[str] = []
+        self.update_calls = 0
+        self.update_gate: asyncio.Event | None = None
+        self.fail_next_update_codes: list[str] = []
         self.list_calls = 0
         self.list_gate: asyncio.Event | None = None
         self.fail_next_list_codes: list[str] = []
@@ -118,10 +123,47 @@ class FakeRepository:
             "author": author,
             "created_at": now,
             "updated_at": now,
+            "text_updated_at": None,
             "deleted_at": None,
         }
         self.cards[row["id"]] = row
         return dict(row)
+
+    @staticmethod
+    def _touch(row: dict[str, Any], changes: dict[str, Any]) -> dict[str, Any]:
+        """Apply ``changes`` the way the ``cards_touch`` trigger does (migration 20261023120000).
+
+        ``updated_at`` becomes the later of now and the old value plus one microsecond, whatever
+        the writer sent; ``text_updated_at`` becomes that new value only when the text changed
+        and is otherwise kept, so a writer can neither forge nor clear it.
+        """
+        old_updated = datetime.fromisoformat(row["updated_at"])
+        new_updated = max(datetime.now(UTC), old_updated + timedelta(microseconds=1)).isoformat()
+        touched = {**row, **changes}
+        touched["updated_at"] = new_updated
+        if changes.get("text", row["text"]) != row["text"]:
+            touched["text_updated_at"] = new_updated
+        else:
+            touched["text_updated_at"] = row.get("text_updated_at")
+        return touched
+
+    async def update_card_text(
+        self, *, workspace_id: str, card_id: str, text: str
+    ) -> dict[str, Any] | None:
+        """Change a live card's text in this workspace; None when no such live card matches."""
+        self.update_calls += 1
+        if self.update_gate is not None:
+            await self.update_gate.wait()
+        if self.fail_next_update_codes:
+            code = self.fail_next_update_codes.pop(0)
+            raise APIError({"code": code, "message": "injected"})
+        row = self.cards.get(card_id)
+        if row is None or row["workspace_id"] != workspace_id or row["deleted_at"] is not None:
+            return None
+        if not 1 <= len(text.strip(" ")) <= 500:
+            raise APIError({"code": "23514", "message": "check constraint violated"})
+        self.cards[card_id] = self._touch(row, {"text": text})
+        return dict(self.cards[card_id])
 
     async def list_cards(self, workspace_id: str) -> list[dict[str, Any]]:
         """Live cards of a workspace in (order_index, created_at, id) order."""
@@ -177,6 +219,7 @@ def seed_card(
     order_index: float = 1024.0,
     created_at: str | None = None,
     deleted_at: str | None = None,
+    text_updated_at: str | None = None,
 ) -> dict[str, Any]:
     """Store a card straight into the fake (no service, no event) and return a copy of its row."""
     workspace = repo.rows[session_id]
@@ -191,6 +234,7 @@ def seed_card(
         "author": author,
         "created_at": moment,
         "updated_at": moment,
+        "text_updated_at": text_updated_at,
         "deleted_at": deleted_at,
     }
     repo.cards[row["id"]] = row
