@@ -98,3 +98,7 @@ class SessionService:
             order_index=next_order_index(current_max),
         )
         return CardView.model_validate(row)
+
+    async def list_cards(self, workspace_id: str) -> list[CardView]:
+        rows = await self._repository.list_cards(workspace_id)
+        return [CardView.model_validate(r) for r in rows]

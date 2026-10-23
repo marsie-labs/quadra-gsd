@@ -36,3 +36,8 @@ def register() -> None:
         hub.register(canvas_view)
         # Closed tabs must leave the registry, or the hub keeps feeding dead views (Pitfall 4).
         ui.context.client.on_delete(lambda: hub.unregister(canvas_view))
+        # Register BEFORE the snapshot read: a card inserted in between still arrives as an
+        # event, and the keyed upsert keeps it single. 02-04 replaces this with a buffered
+        # snapshot protocol and the 503 page for read failures.
+        for card in await get_services().sessions.list_cards(view.workspace_id):
+            canvas_view.apply_card(card)

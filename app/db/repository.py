@@ -96,3 +96,17 @@ class Repository:
         if not rows:
             return None
         return float(rows[0]["order_index"])
+
+    async def list_cards(self, workspace_id: str) -> list[dict[str, Any]]:
+        """Every live card of a workspace in display order. Read on page open only."""
+        resp = await (
+            self._client.table("cards")
+            .select(CARD_COLUMNS)
+            .eq("workspace_id", workspace_id)
+            .is_("deleted_at", "null")
+            .order("order_index")
+            .order("created_at")
+            .order("id")
+            .execute()
+        )
+        return resp.data
