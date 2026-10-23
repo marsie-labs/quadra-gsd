@@ -14,16 +14,17 @@ Everyone on the link sees the same four-quadrant canvas update live, and once cl
 
 ### Validated
 
-(None yet — ship to validate)
+- ✓ User can create a new session by entering a project name; system generates a unique, unguessable `session_id` — Phase 1
+- ✓ New session instantiates an active canvas linked to the four quadrants: IS, IS NOT, DOES, DOES NOT (created atomically) — Phase 1
+- ✓ Session is accessible via shareable link only (no accounts/login); anyone with link can join; unknown link shows not-found — Phase 1
+- ✓ On first visit, participant is prompted for a display name, remembered in their browser across reloads — Phase 1
+- ✓ App runs locally with documented setup (env vars, migrations, single worker); startup check proves DB change events reach the Python server — Phase 1
 
 ### Active
 
 **Intent 1 — Workspace and realtime canvas initialization**
-- [ ] User can create a new session by entering a project name; system generates a unique `session_id`
-- [ ] New session instantiates an active canvas linked to the four quadrants: IS, IS NOT, DOES, DOES NOT
-- [ ] Session is accessible via shareable link only (no accounts/login); anyone with link can join and edit
-- [ ] On first visit, participant is prompted for a display name, remembered in their browser, used as card author
-- [ ] Server holds supabase-py Realtime subscriptions on workspace/card tables and relays changes to all connected browsers on that session (session init and modification)
+- [ ] Participant's display name is used as card author
+- [ ] Server holds supabase-py Realtime subscriptions on workspace/card tables and relays changes to all connected browsers on that session (session init and modification) — connection proven in Phase 1; relay to browsers pending
 
 **Intent 2 — Realtime collaborative boundary management**
 - [ ] Participant can add a text card to any quadrant
@@ -82,15 +83,19 @@ Everyone on the link sees the same four-quadrant canvas update live, and once cl
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| FastAPI + NiceGUI | Python end-to-end; NiceGUI runs on FastAPI and is server-driven over WebSocket | — Pending |
-| Python relays Realtime to browsers (supabase-py server-side) | Python stays single gateway; browsers never hold Supabase keys | — Pending |
+| FastAPI + NiceGUI | Python end-to-end; NiceGUI runs on FastAPI and is server-driven over WebSocket | ✓ Good — Phase 1 skeleton works; launcher hard-codes a single worker |
+| Python relays Realtime to browsers (supabase-py server-side) | Python stays single gateway; browsers never hold Supabase keys | ✓ Connection proven — startup nonce round trip verified (Phase 1); browser relay lands in Phase 2 |
 | Sticky-note cards per quadrant | Matches workshop practice; supports add/edit/move/delete | — Pending |
 | Anyone with link can close session | No auth model; confirmation dialog guards accidents | — Pending |
-| Display name on join (browser-remembered) | Author identifier without accounts | — Pending |
+| Display name on join (browser-remembered) | Author identifier without accounts | ✓ Good — inline banner, 1-year session cookie, never overwrites a stored name (Phase 1) |
 | Closed is terminal, no reopen | Agent always sees stable final snapshot | — Pending |
 | Agent API: REST only, 409 when open | Simple contract for harness; explicit error semantics | — Pending |
 | Soft-delete; exclude deleted from export | Preserve history in DB, clean output for agent | — Pending |
 | Move via menu, not drag-and-drop | Reliability over polish for v1 | — Pending |
+| New `sb_secret_` key for Realtime; legacy JWT only as optional override | Legacy keys deprecated end of 2026; hosted Realtime accepts the new key | ✓ Verified Phase 1 (361–1266 ms round trip, override unset) |
+| Workspace invariants (atomic create, name length) enforced in Postgres | Agent relies on DB-level integrity, not UI checks | ✓ Good — UI/service/DB name-length parity proven live (Phase 1) |
+| Retry session creation once, only on unique-violation 23505 | Token collision is the only retryable failure; others must surface | ✓ Good (Phase 1) |
+| Home create is single-shot (re-entrancy guard, locked until navigation) | Double Enter/click created duplicate sessions | ✓ Good — confirmed in UAT (Phase 1) |
 
 ## Evolution
 
@@ -110,4 +115,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-22 after initialization*
+*Last updated: 2026-10-22 after Phase 1*

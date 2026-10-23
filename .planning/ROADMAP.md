@@ -12,7 +12,7 @@ Quadra goes from an empty repo to a working, link-shared IS / IS NOT / DOES / DO
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Session Skeleton** - Create a session, share its link, join with a display name, see the four empty quadrants
+- [x] **Phase 1: Session Skeleton** - Create a session, share its link, join with a display name, see the four empty quadrants (completed 2026-10-22)
 - [ ] **Phase 2: Live Shared Canvas** - Participants add cards and see each other's cards appear live via Supabase Realtime
 - [ ] **Phase 3: Card Editing** - Edit, delete, move and reorder cards with instant, duplicate-free feedback
 - [ ] **Phase 4: Session Close & Lock** - Confirmed one-way close turns every client read-only, enforced in the DB
@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Opening a link with an unknown `session_id` shows a not-found page
   5. Developer can follow the README to set env vars, apply migrations to the hosted Supabase project, and start the app (single worker); a startup check confirms DB change events reach the Python server
 
-**Plans:** 7/7 plans executed
+**Plans:** 7/7 plans complete
 
 Plans:
 **Wave 1**
@@ -125,7 +125,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Session Skeleton | 7/7 | In Progress | - |
+| 1. Session Skeleton | 7/7 | Complete    | 2026-10-22 |
 | 2. Live Shared Canvas | 0/TBD | Not started | - |
 | 3. Card Editing | 0/TBD | Not started | - |
 | 4. Session Close & Lock | 0/TBD | Not started | - |
