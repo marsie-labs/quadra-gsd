@@ -65,7 +65,8 @@ def name_banner(on_saved: Callable[[str], None]) -> ui.element:
             if name is None:
                 field.error = NAME_ERROR
                 return
-            banner.delete()
+            if not banner.is_deleted:  # a second queued submit must not delete it again (WR-06)
+                banner.delete()
             on_saved(name)
 
         field.on("keydown.enter", submit)
@@ -101,7 +102,8 @@ async def ensure_display_name(on_saved: Callable[[str], None] | None = None) -> 
             ui.button("Continue", on_click=submit)
 
     result = await dialog
-    dialog.delete()
+    if not dialog.is_deleted:
+        dialog.delete()
     if result and on_saved is not None:
         on_saved(result)
     return result or None

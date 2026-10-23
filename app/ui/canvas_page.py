@@ -23,12 +23,17 @@ def register() -> None:
             # Read-only text (D-03): no input and no rename control. Empty when unnamed.
             header_name = ui.label(current_name() or "").classes("text-grey").mark("display-name")
 
+        banner: ui.element | None = None
+
         def on_name_saved(name: str) -> None:
             header_name.text = name
+            # Naming through the add dialog must also retire the stale inline banner.
+            if banner is not None and not banner.is_deleted:
+                banner.delete()
 
         if current_name() is None:
             # Inline and ignorable, never a blocking modal (D-01).
-            name_banner(on_saved=on_name_saved)
+            banner = name_banner(on_saved=on_name_saved)
 
         canvas_view = CanvasView(view, on_name_saved=on_name_saved)
         canvas_view.build()

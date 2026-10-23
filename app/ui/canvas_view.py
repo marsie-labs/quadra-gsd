@@ -39,6 +39,8 @@ class CanvasView:
         self._widgets: dict[str, ui.element] = {}
         self._lists: dict[str, ui.element] = {}
         self._empty: dict[str, ui.label] = {}
+        # Quadrants with an add in flight: set before the first await, released in ``finally``.
+        self._adding: set[str] = set()
 
     def build(self) -> None:
         with ui.grid().classes("grid-cols-1 md:grid-cols-2 gap-4 w-full"):
@@ -61,33 +63,43 @@ class CanvasView:
                 field = ui.input("New card").mark(f"add-input-{quadrant.kind}")
                 field.on_value_change(lambda _, field=field: setattr(field, "error", None))
 
-                async def add(_=None, quadrant=quadrant, field=field) -> None:
-                    await self._add_card(quadrant, field)
+                button = ui.button("Add").mark(f"add-button-{quadrant.kind}")
+
+                async def add(_=None, quadrant=quadrant, field=field, button=button) -> None:
+                    await self._add_card(quadrant, field, button)
 
                 field.on("keydown.enter", add)
-                ui.button("Add", on_click=add).mark(f"add-button-{quadrant.kind}")
+                button.on_click(add)
 
-    async def _add_card(self, quadrant: QuadrantView, field: ui.input) -> None:
+    async def _add_card(self, quadrant: QuadrantView, field: ui.input, button: ui.button) -> None:
+        if quadrant.id in self._adding:
+            return  # a write for this quadrant is already in flight (double click / double Enter)
         if validate_card_text(field.value) is None:
             field.error = CARD_TEXT_ERROR
             return
-        # Phase 1 D-02: no placeholder author ever. Cancel keeps the typed text.
-        author = await ensure_display_name(on_saved=self._on_name_saved)
-        if author is None:
-            return
+        self._adding.add(quadrant.id)
+        button.disable()
         try:
-            card = await get_services().sessions.add_card(
-                self.workspace_id, quadrant.id, field.value or "", author
-            )
-        except InvalidCardText:
-            field.error = CARD_TEXT_ERROR
-            return
-        except Exception as exc:
-            logger.warning("add_card failed: %s", type(exc).__name__)
-            ui.notify("Could not add the card. Please try again.", type="negative")
-            return
-        field.value = ""
-        self.apply_card(card)
+            # Phase 1 D-02: no placeholder author ever. Cancel keeps the typed text.
+            author = await ensure_display_name(on_saved=self._on_name_saved)
+            if author is None:
+                return
+            try:
+                card = await get_services().sessions.add_card(
+                    self.workspace_id, quadrant.id, field.value or "", author
+                )
+            except InvalidCardText:
+                field.error = CARD_TEXT_ERROR
+                return
+            except Exception as exc:
+                logger.warning("add_card failed: %s", type(exc).__name__)
+                ui.notify("Could not add the card. Please try again.", type="negative")
+                return
+            field.value = ""
+            self.apply_card(card)
+        finally:
+            self._adding.discard(quadrant.id)
+            button.enable()
 
     def apply_card(self, card: CardView) -> None:
         """Keyed upsert of one card widget; called for confirmed writes and Realtime events."""
