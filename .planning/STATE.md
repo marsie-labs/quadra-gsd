@@ -2,17 +2,17 @@
 gsd_state_version: "1.0"
 current_phase: 02
 current_phase_name: Live Shared Canvas
-status: executing
-stopped_at: Completed 02-04-PLAN.md
-last_updated: "2026-10-23T11:32:33.772Z"
+status: verifying
+stopped_at: Completed 02-05-PLAN.md
+last_updated: "2026-10-23T11:41:13.184Z"
 last_activity: 2026-10-23
 last_activity_desc: Phase 02 execution started
-state_head: cc97363703e089e313fe4d429efa3be5c8e07a81
+state_head: f1139f614df9a9ec3a1a7a1ee6ae33206c28de40
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
   percent: 20
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-22)
 
 Phase: 02 (Live Shared Canvas) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-23 — Phase 02 execution started
 
 Progress: [██░░░░░░░░] 20%
@@ -66,6 +66,7 @@ Progress: [██░░░░░░░░] 20%
 | Phase 02 P02 | 33 min | 3 tasks | 11 files |
 | Phase 02 P03 | 5 min | 2 tasks | 6 files |
 | Phase 02 P04 | 7 min | 2 tasks | 5 files |
+| Phase 02 P05 | 6 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,8 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-03: apply_card is a full-row projection with stale updated_at guard (older ignored, equal applies); remove_card drops state before refreshing the hint
 - [Phase 02]: 02-04: snapshot is authoritative; load_snapshot re-renders cards that differ, then replays buffered events through the stale guard — A change newer than the snapshot must never be lost or undone
 - [Phase 02]: 02-04: read counter (not boolean) gates loading so overlapping page-open and resync reads stay safe — Hub-initiated request_resync can fire during page open
+- [Phase 02]: 02-05: canvases resync only after the nonce probe re-proves change data capture; recovery is single-flight with 1-30 s backoff
+- [Phase 02]: 02-05: hub supervisor depends on realtime 2.33 private AsyncRealtimeClient._listen_task, pinned by uv.lock and guarded by test_listen_task_attribute_exists
 
 ### Pending Todos
 
@@ -115,6 +118,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-23T11:32:33.706Z
-Stopped at: Completed 02-04-PLAN.md
+Last session: 2026-10-23T11:41:13.118Z
+Stopped at: Completed 02-05-PLAN.md
 Resume file: None

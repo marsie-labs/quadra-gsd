@@ -34,10 +34,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Sync
 
-- [ ] **SYNC-01**: A card change by one participant appears for all others on the session within ~1s
-- [ ] **SYNC-02**: Updates are delivered via Supabase Realtime events relayed by the Python server (no polling)
+- [x] **SYNC-01**: A card change by one participant appears for all others on the session within ~1s
+- [x] **SYNC-02**: Updates are delivered via Supabase Realtime events relayed by the Python server (no polling)
 - [x] **SYNC-03**: Changes made directly in the database (outside the app) also appear live
-- [ ] **SYNC-04**: After a browser reconnect or server restart, the client shows current state
+- [x] **SYNC-04**: After a browser reconnect or server restart, the client shows current state
 
 ### Close
 
@@ -58,7 +58,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Quality
 
 - [ ] **QUAL-01**: Automated tests cover card operations, close/lock rules, and all agent responses
-- [ ] **QUAL-02**: Integration tests against real Supabase verify realtime propagation between two clients
+- [x] **QUAL-02**: Integration tests against real Supabase verify realtime propagation between two clients
 - [ ] **QUAL-03**: Documented E2E demo: create → 2+ browsers edit live → close → agent GET returns full JSON
 - [x] **QUAL-04**: App runs locally with documented setup (env vars, migrations, single worker)
 
@@ -117,11 +117,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CARD-01 | Phase 2 | Complete |
 | CARD-06 | Phase 2 | Complete |
 | CARD-07 | Phase 2 | Complete |
-| SYNC-01 | Phase 2 | Pending |
-| SYNC-02 | Phase 2 | Pending |
+| SYNC-01 | Phase 2 | Complete |
+| SYNC-02 | Phase 2 | Complete |
 | SYNC-03 | Phase 2 | Complete |
-| SYNC-04 | Phase 2 | Pending |
-| QUAL-02 | Phase 2 | Pending |
+| SYNC-04 | Phase 2 | Complete |
+| QUAL-02 | Phase 2 | Complete |
 | CARD-02 | Phase 3 | Pending |
 | CARD-03 | Phase 3 | Pending |
 | CARD-04 | Phase 3 | Pending |
