@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 03
 current_phase_name: Card Editing
 status: executing
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-10-23T16:36:06.962Z"
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-10-23T16:44:19.405Z"
 last_activity: 2026-10-23
 last_activity_desc: Phase 03 execution started
-state_head: 15cda2b7fe135594b3b346c98902f30906015600
+state_head: 6fcde5a193d35bf3e582555647cffc6c82b97c81
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 17
-  completed_plans: 13
+  completed_plans: 14
   percent: 40
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-23)
 ## Current Position
 
 Phase: 03 (Card Editing) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-10-23 — Phase 03 execution started
 
@@ -69,6 +69,7 @@ Progress: [████░░░░░░] 40%
 | Phase 02 P04 | 7 min | 2 tasks | 5 files |
 | Phase 02 P05 | 6 min | 3 tasks | 5 files |
 | Phase 03 P01 | ~1 session + human checkpoint | 2 tasks | 7 files |
+| Phase 03 P02 | 5 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -103,6 +104,8 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-05: hub supervisor depends on realtime 2.33 private AsyncRealtimeClient._listen_task, pinned by uv.lock and guarded by test_listen_task_attribute_exists
 - [Phase 03]: cards_touch trigger maintains updated_at (greatest(clock_timestamp, old+1us)) and text_updated_at; writers send only text
 - [Phase 03]: CanvasView renders cards in place with a separate _optimistic overlay and a single guarded _write path
+- [Phase 03]: 03-02: CardGone in _write removes the card and warns (not rolled back); _notify takes a type, default warning
+- [Phase 03]: 03-02: FakeRepository._touch mirrors cards_touch; UI tests wait on repository effects because should_see also matches textarea values
 
 ### Pending Todos
 
@@ -123,6 +126,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-23T16:36:06.852Z
-Stopped at: Completed 03-01-PLAN.md
+Last session: 2026-10-23T16:44:19.299Z
+Stopped at: Completed 03-02-PLAN.md
 Resume file: None
