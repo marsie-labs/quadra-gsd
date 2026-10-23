@@ -165,6 +165,21 @@ class FakeRepository:
         self.cards[card_id] = self._touch(row, {"text": text})
         return dict(self.cards[card_id])
 
+    async def soft_delete_card(self, *, workspace_id: str, card_id: str) -> dict[str, Any] | None:
+        """Set ``deleted_at`` on a live card of this workspace; None when no such live card
+        matches, so a repeat or a racing second delete is a harmless no-op (CARD-03)."""
+        self.update_calls += 1
+        if self.update_gate is not None:
+            await self.update_gate.wait()
+        if self.fail_next_update_codes:
+            code = self.fail_next_update_codes.pop(0)
+            raise APIError({"code": code, "message": "injected"})
+        row = self.cards.get(card_id)
+        if row is None or row["workspace_id"] != workspace_id or row["deleted_at"] is not None:
+            return None
+        self.cards[card_id] = self._touch(row, {"deleted_at": datetime.now(UTC).isoformat()})
+        return dict(self.cards[card_id])
+
     async def list_cards(self, workspace_id: str) -> list[dict[str, Any]]:
         """Live cards of a workspace in (order_index, created_at, id) order."""
         self.list_calls += 1
