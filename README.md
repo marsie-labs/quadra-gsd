@@ -4,7 +4,7 @@ Quadra is a realtime collaborative boundary canvas. A small team opens a shared 
 
 It is Python end to end: FastAPI and NiceGUI for the server and UI, Supabase PostgreSQL for persistence, and Supabase Realtime events relayed by the Python server.
 
-This README covers Phases 1 and 2. Phase 1 is the session skeleton: create a session, open its unguessable link, enter a display name and see the four labeled quadrants, with the schema and the Realtime connection proven at startup. Phase 2 is the live shared canvas: add cards to any quadrant and watch every open browser update live, with the server recovering by itself from Realtime and connection loss.
+This README covers Phases 1 to 3. Phase 1 is the session skeleton: create a session, open its unguessable link, enter a display name and see the four labeled quadrants, with the schema and the Realtime connection proven at startup. Phase 2 is the live shared canvas: add cards to any quadrant and watch every open browser update live, with the server recovering by itself from Realtime and connection loss. Phase 3 is card editing: edit, delete, move and reorder cards live.
 
 ## Prerequisites
 
@@ -123,6 +123,22 @@ So `SUPABASE_REALTIME_KEY` is an optional override. Set it only if the startup c
 
 Each quadrant has an add field. The first time someone adds a card in a browser, the page asks for a display name; the name is stored in that browser and reused afterwards. Card text is 1 to 500 characters (it is trimmed first). A card shows "author · HH:MM", where the time is in the server's local time zone; hover it for the full timestamp.
 
+## Editing cards
+
+Click a card's text, or choose Edit in the card's ⋮ menu, to edit it in place. Enter saves, Shift+Enter starts a new line, clicking elsewhere saves and Esc cancels.
+
+Edited cards show "(edited)" after the time.
+
+The menu also has Move to (another quadrant; the card goes to the end), Move up and Move down (within the quadrant; each is disabled at its end) and Delete. Delete is immediate, with a "Card deleted" message; the card is kept in the database with `deleted_at`.
+
+Anyone with the link can do all of this without entering a name, and the card keeps its original author.
+
+Your own changes show at once. If saving fails, the card goes back and a message says so.
+
+If someone changes a card you are editing, your text is kept, and the last save wins.
+
+Reordering writes one row: the moved card gets an `order_index` between its new neighbours, so the other cards are never renumbered. If two people reorder one quadrant at the same time, every browser still shows the same order, also after a reload.
+
 ## Live updates
 
 Every change reaches open browsers only through Supabase Realtime events relayed by the Python server. There is no polling and no timer-driven refresh: the server holds one Realtime subscription and fans each event out to the canvases of the session it belongs to.
@@ -146,6 +162,8 @@ update public.cards set deleted_at = now() where text = 'Edited in SQL';
 
 The card appears, changes text and then disappears in every open browser without a reload.
 
+A text change made in SQL also shows "(edited)" on the card.
+
 With `REALTIME_CHECK=off` the server never connects to Realtime, so there are **no live updates at all**: a browser sees only what the database held when its page opened or reconnected. Use it for tests only.
 
 ## Reconnects and restarts
@@ -164,7 +182,7 @@ uv run pytest -m integration -q -rs    # hosted Supabase; needs .env
 uv run ruff check . && uv run ruff format --check .
 ```
 
-The integration suite needs `.env` with `SUPABASE_URL`, `SUPABASE_SECRET_KEY` and `STORAGE_SECRET`, plus `SUPABASE_PUBLISHABLE_KEY` for the anonymous-denial test (without it that test is reported as skipped). It includes tests that start the real server as a subprocess, wait for `/healthz` to report `verified`, check the one-year session cookie and assert that no key appears in the console output (`test_realtime_probe.py`), restart the server and find a card written while it was down (`test_restart_recovery.py`), prove live fan-out and convergence (`test_live_cards.py`), and close the hub's Realtime socket and check that it recovers and the canvases pick up a card written during the outage (`test_realtime_recovery.py`).
+The integration suite needs `.env` with `SUPABASE_URL`, `SUPABASE_SECRET_KEY` and `STORAGE_SECRET`, plus `SUPABASE_PUBLISHABLE_KEY` for the anonymous-denial test (without it that test is reported as skipped). It includes tests that start the real server as a subprocess, wait for `/healthz` to report `verified`, check the one-year session cookie and assert that no key appears in the console output (`test_realtime_probe.py`), restart the server and find a card written while it was down (`test_restart_recovery.py`), prove live fan-out and convergence (`test_live_cards.py`), and close the hub's Realtime socket and check that it recovers and the canvases pick up a card written during the outage (`test_realtime_recovery.py`), and prove the card actions live: edits and their storage (`test_live_card_edits.py`, `test_card_edit_storage.py`), move and delete (`test_card_actions_live.py`) and reordering with concurrent convergence (`test_card_reorder_live.py`).
 
 ## Project layout
 
