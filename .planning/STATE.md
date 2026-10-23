@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 02
 current_phase_name: Live Shared Canvas
 status: executing
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-10-23T10:40:40.219Z"
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-10-23T11:17:28.999Z"
 last_activity: 2026-10-23
 last_activity_desc: Phase 02 execution started
-state_head: 961a3f08bf60295260578797d5510264547e3ead
+state_head: d601ddbc15988da046204cdca3b229dbf9cc8bfd
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 12
-  completed_plans: 8
+  completed_plans: 9
   percent: 20
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-22)
 ## Current Position
 
 Phase: 02 (Live Shared Canvas) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-10-23 — Phase 02 execution started
 
@@ -63,6 +63,7 @@ Progress: [██░░░░░░░░] 20%
 | Phase 01 P05 | 4 min | 2 tasks | 5 files |
 | Phase 01 P06 | 2 min | 2 tasks | 8 files |
 | Phase 02 P01 | 6 min | 2 tasks | 12 files |
+| Phase 02 P02 | 33 min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,8 @@ Recent decisions affecting current work:
 - [Phase 01]: 01-06: save_display_name never overwrites a stored name (D-03); name length counted in code points after trim to match DB char_length
 - [Phase 02]: 02-01: Card times render as HH:MM in the server's local zone with full timestamp tooltip (A-02); no Realtime timestamp normalizer needed (A-01)
 - [Phase 02]: 02-01: NiceGUI test plugin runs click handlers under the most recently opened request's storage; multi-browser UI tests open the acting (named) browser last
+- [Phase 02]: 02-02: card text trimmed then counted in code points (1-500); no browser-side length limit on the add field (UTF-16 vs code points); text validated before the name gate
+- [Phase 02]: 02-02: banner reference kept in canvas_page so naming via the add dialog removes the inline banner; deletions guarded with is_deleted (WR-06)
 
 ### Pending Todos
 
@@ -106,6 +109,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-23T10:40:40.156Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-10-23T11:17:28.935Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None

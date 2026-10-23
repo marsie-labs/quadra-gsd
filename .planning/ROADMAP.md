@@ -70,14 +70,14 @@ Plans:
   4. After a browser reconnect or a server restart, the canvas shows every card, including ones added while disconnected
   5. An automated integration test against Supabase shows two clients converging on the same cards via Realtime
 
-**Plans:** 1/5 plans executed
+**Plans:** 2/5 plans executed
 
 Plans:
 **Wave 1**
 - [x] 02-01-PLAN.md — Tracer: a card added in browser A is stored in hosted Supabase and appears live in browser B via the Realtime hub; reopened canvas shows stored cards
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 02-02-PLAN.md — Authoring rules: [BLOCKING] author-nonblank migration push (WR-07), card text validation messages, name gate on add, double-submit guard, CARD-07 storage proofs
+- [x] 02-02-PLAN.md — Authoring rules: [BLOCKING] author-nonblank migration push (WR-07), card text validation messages, name gate on add, double-submit guard, CARD-07 storage proofs
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 02-03-PLAN.md — Live fidelity: edits/moves/deletes and DB-direct changes projected live; two-client convergence and latency proof against hosted Supabase
@@ -143,7 +143,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Session Skeleton | 7/7 | Complete    | 2026-10-22 |
-| 2. Live Shared Canvas | 1/5 | In Progress | - |
+| 2. Live Shared Canvas | 2/5 | In Progress | - |
 | 3. Card Editing | 0/TBD | Not started | - |
 | 4. Session Close & Lock | 0/TBD | Not started | - |
 | 5. Agent Results & E2E | 0/TBD | Not started | - |

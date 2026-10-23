@@ -19,17 +19,17 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **IDEN-01**: On first visit, participant is prompted for a display name
 - [x] **IDEN-02**: Display name is remembered in the browser across reloads and sessions
-- [ ] **IDEN-03**: Participant's display name is recorded as author on cards they create
+- [x] **IDEN-03**: Participant's display name is recorded as author on cards they create
 
 ### Cards
 
-- [ ] **CARD-01**: Participant can add a text card to any quadrant (empty rejected, max 500 chars)
+- [x] **CARD-01**: Participant can add a text card to any quadrant (empty rejected, max 500 chars)
 - [ ] **CARD-02**: Participant can edit a card's text
 - [ ] **CARD-03**: Participant can delete a card (soft-delete: gone for everyone, kept in DB)
 - [ ] **CARD-04**: Participant can move a card to another quadrant via a move menu
 - [ ] **CARD-05**: Participant can reorder a card within its quadrant via up/down controls
 - [ ] **CARD-06**: Each card shows its author's name and time
-- [ ] **CARD-07**: Each card stores quadrant, order index, author, created/updated timestamps, deleted timestamp
+- [x] **CARD-07**: Each card stores quadrant, order index, author, created/updated timestamps, deleted timestamp
 - [ ] **CARD-08**: Participant's own actions appear instantly with no duplicates when confirmation arrives; failed writes roll back with a message
 
 ### Sync
@@ -112,11 +112,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SESS-05 | Phase 1 | Complete |
 | IDEN-01 | Phase 1 | Complete |
 | IDEN-02 | Phase 1 | Complete |
-| IDEN-03 | Phase 2 | Pending |
+| IDEN-03 | Phase 2 | Complete |
 | QUAL-04 | Phase 1 | Complete |
-| CARD-01 | Phase 2 | Pending |
+| CARD-01 | Phase 2 | Complete |
 | CARD-06 | Phase 2 | Pending |
-| CARD-07 | Phase 2 | Pending |
+| CARD-07 | Phase 2 | Complete |
 | SYNC-01 | Phase 2 | Pending |
 | SYNC-02 | Phase 2 | Pending |
 | SYNC-03 | Phase 2 | Pending |
