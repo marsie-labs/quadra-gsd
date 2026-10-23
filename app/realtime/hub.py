@@ -53,6 +53,8 @@ class CardListener(Protocol):
 
     def apply_card(self, card: CardView) -> None: ...
 
+    def remove_card(self, card_id: str) -> None: ...
+
 
 class RealtimeCheckError(RuntimeError):
     """The Realtime startup check failed at a named stage."""
@@ -117,22 +119,45 @@ class RealtimeHub:
         return channel
 
     def _on_card(self, payload: Any) -> None:
-        """Plain def (called synchronously in the socket loop): fan a card row out to its canvases.
+        """Plain def (called synchronously in the socket loop): fan a card change out to canvases.
 
-        Never raises and never logs the payload. Routing is strictly by the row's workspace_id.
+        INSERT/UPDATE apply the row to its workspace's canvases (an UPDATE that changes
+        workspace first removes the card from the old workspace's canvases). DELETE carries only
+        ``old_record`` (replica identity full) and removes the card. Never raises and never logs
+        the payload: a malformed event costs one warning naming the event type and exception class.
         """
+        event_type = "unknown"
         try:
-            record = payload["data"]["record"]
-            # DELETE events carry only old_record (projected in 02-03): nothing to dispatch.
-            if not record or "id" not in record or "workspace_id" not in record:
+            data = payload["data"]
+            raw_type = data["type"]
+            raw_type = str(getattr(raw_type, "value", raw_type))
+            if raw_type == "DELETE":
+                event_type = raw_type
+                old = data["old_record"]
+                card_id, workspace_id = str(old["id"]), str(old["workspace_id"])
+                self._fan_out(workspace_id, lambda listener: listener.remove_card(card_id))
                 return
-            card = CardView.model_validate(record)
-        except (KeyError, TypeError, ValidationError) as exc:
-            logger.warning("ignored cards event: %s", type(exc).__name__)
+            if raw_type not in ("INSERT", "UPDATE"):
+                raise ValueError("unknown event type")
+            event_type = raw_type
+            card = CardView.model_validate(data["record"])
+            old_workspace_id = None
+            if raw_type == "UPDATE":
+                old_record = data.get("old_record")
+                if isinstance(old_record, dict):
+                    old_workspace_id = old_record.get("workspace_id")
+        except (KeyError, TypeError, ValueError, AttributeError, ValidationError) as exc:
+            logger.warning("ignored cards event %s: %s", event_type, type(exc).__name__)
             return
-        for listener in list(self._listeners.get(card.workspace_id, ())):
+        if old_workspace_id is not None and old_workspace_id != card.workspace_id:
+            self._fan_out(str(old_workspace_id), lambda listener: listener.remove_card(card.id))
+        self._fan_out(card.workspace_id, lambda listener: listener.apply_card(card))
+
+    def _fan_out(self, workspace_id: str, call: Callable[[CardListener], None]) -> None:
+        """Call every listener of one workspace; one failing canvas never blocks the others."""
+        for listener in list(self._listeners.get(workspace_id, ())):
             try:
-                listener.apply_card(card)
+                call(listener)
             except Exception as exc:
                 logger.warning("canvas listener failed: %s", type(exc).__name__)
 

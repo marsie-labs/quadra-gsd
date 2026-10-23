@@ -1,4 +1,4 @@
-"""The canvas as a live projection of the cards table: edits, moves, deletes, stale and foreign events.
+"""The canvas as a live projection of the cards table: edits, moves, deletes, foreign events.
 
 Events are fed to ``hub._on_card`` exactly as the Realtime socket loop would hand them over; the
 rows come from ``seed_card`` so the fake repository and the canvases agree on ids and workspaces.

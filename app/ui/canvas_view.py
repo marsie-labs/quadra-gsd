@@ -1,9 +1,10 @@
 """CanvasView: the four quadrant columns of one open canvas and their live card widgets.
 
 One instance per page visit. It is registered with the RealtimeHub (``CardListener``), which
-calls ``apply_card`` for every card row of this workspace. ``apply_card`` is a keyed upsert, so
-the actor's own card (rendered from the confirmed write and again from the Realtime echo) shows
-exactly once. User text is rendered only through ``ui.label``: never HTML or Markdown.
+calls ``apply_card`` for every card row of this workspace and ``remove_card`` for deletes and
+moves to another session. ``apply_card`` is a keyed upsert, so the actor's own card (rendered
+from the confirmed write and again from the Realtime echo) shows exactly once.
+User text is rendered only through ``ui.label``: never HTML or Markdown.
 """
 
 import logging
@@ -102,17 +103,23 @@ class CanvasView:
             button.enable()
 
     def apply_card(self, card: CardView) -> None:
-        """Keyed upsert of one card widget; called for confirmed writes and Realtime events."""
+        """Project one full card row: upsert, move between quadrants, or drop when soft-deleted.
+
+        Called for confirmed writes and Realtime events. A row older than the card shown (by
+        ``updated_at``) is ignored; an equal or newer one wins, so direct DB edits that do not
+        touch ``updated_at`` still apply.
+        """
+        if card.deleted_at is not None:
+            self.remove_card(card.id)
+            return
         container = self._lists.get(card.quadrant_id)
         if container is None:
             logger.warning("card for unknown quadrant skipped")
             return
-        old = self._widgets.pop(card.id, None)
-        if old is not None:
-            old_card = self._cards.get(card.id)
-            old.delete()
-            if old_card is not None and old_card.quadrant_id != card.quadrant_id:
-                self._refresh_hint(old_card.quadrant_id)
+        shown = self._cards.get(card.id)
+        if shown is not None and card.updated_at < shown.updated_at:
+            return
+        self.remove_card(card.id)  # drops the old widget wherever it is (maybe another quadrant)
         self._cards[card.id] = card
 
         with container:
@@ -131,6 +138,15 @@ class CanvasView:
         if target != len(ordered) - 1:
             widget.move(target_index=target)
         self._refresh_hint(card.quadrant_id)
+
+    def remove_card(self, card_id: str) -> None:
+        """Drop a card's widget and state and refresh its quadrant's hint; unknown id: no-op."""
+        card = self._cards.pop(card_id, None)
+        widget = self._widgets.pop(card_id, None)
+        if widget is not None:
+            widget.delete()
+        if card is not None:
+            self._refresh_hint(card.quadrant_id)
 
     def _refresh_hint(self, quadrant_id: str) -> None:
         has_cards = any(c.quadrant_id == quadrant_id for c in self._cards.values())
