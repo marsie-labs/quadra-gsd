@@ -103,7 +103,7 @@ Plans:
   4. Participant can reorder a card up/down within its quadrant; order matches across clients and after reload
   5. The acting participant sees their change instantly with no duplicate or flicker when the Realtime echo arrives; a failed write rolls back with a message
 
-**Plans:** 2/5 plans executed
+**Plans:** 3/5 plans executed
 
 Plans:
 **Wave 1**
@@ -113,7 +113,7 @@ Plans:
 - [x] 03-02-PLAN.md — Edit slice edges: trigger-mirroring fake, validation, rollback, CardGone (card deleted meanwhile), no duplicate or rebuild on echo; trigger timestamp rules and edit scoping proven against hosted Supabase
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 03-03-PLAN.md — Edit interaction: card menu with Edit, Enter / Shift+Enter / blur / Esc, unchanged and invalid text, per-card re-entrancy, no name needed; open drafts survive remote edits, resyncs and moves (D-04), last save wins
+- [x] 03-03-PLAN.md — Edit interaction: card menu with Edit, Enter / Shift+Enter / blur / Esc, unchanged and invalid text, per-card re-entrancy, no name needed; open drafts survive remote edits, resyncs and moves (D-04), last save wins
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 03-04-PLAN.md — Delete (instant, "Card deleted", soft, idempotent) and Move to another quadrant (end of target) with optimistic rollback; live propagation, concurrent deletes, cross-session move refused
@@ -161,6 +161,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Session Skeleton | 7/7 | Complete    | 2026-10-22 |
 | 2. Live Shared Canvas | 5/5 | Complete    | 2026-10-23 |
-| 3. Card Editing | 2/5 | In Progress | - |
+| 3. Card Editing | 3/5 | In Progress | - |
 | 4. Session Close & Lock | 0/TBD | Not started | - |
 | 5. Agent Results & E2E | 0/TBD | Not started | - |

@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 03
 current_phase_name: Card Editing
 status: executing
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-10-23T16:44:19.405Z"
+stopped_at: Completed 03-03-PLAN.md
+last_updated: "2026-10-23T16:54:08.183Z"
 last_activity: 2026-10-23
 last_activity_desc: Phase 03 execution started
-state_head: 6fcde5a193d35bf3e582555647cffc6c82b97c81
+state_head: c4e17c74a9dbc7c0e56827a76fcb7791474f0386
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 17
-  completed_plans: 14
+  completed_plans: 15
   percent: 40
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-23)
 ## Current Position
 
 Phase: 03 (Card Editing) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-10-23 — Phase 03 execution started
 
@@ -70,6 +70,7 @@ Progress: [████░░░░░░] 40%
 | Phase 02 P05 | 6 min | 3 tasks | 5 files |
 | Phase 03 P01 | ~1 session + human checkpoint | 2 tasks | 7 files |
 | Phase 03 P02 | 5 min | 2 tasks | 4 files |
+| Phase 03 P03 | 12 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,8 @@ Recent decisions affecting current work:
 - [Phase 03]: CanvasView renders cards in place with a separate _optimistic overlay and a single guarded _write path
 - [Phase 03]: 03-02: CardGone in _write removes the card and warns (not rolled back); _notify takes a type, default warning
 - [Phase 03]: 03-02: FakeRepository._touch mirrors cards_touch; UI tests wait on repository effects because should_see also matches textarea values
+- [Phase 03]: 03-03: card menu uses Quasar no-refocus so closing it after Edit cannot blur the new editor — A refocus of the menu button would blur the autofocused textarea; blur saves, and unchanged text closes the editor at once
+- [Phase 03]: 03-03: the open edit session is the done flag; Enter, Esc and blur cannot write twice — Whichever event closes the session first wins; the rest find no session and return
 
 ### Pending Todos
 
@@ -126,6 +129,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-23T16:44:19.299Z
-Stopped at: Completed 03-02-PLAN.md
+Last session: 2026-10-23T16:54:08.072Z
+Stopped at: Completed 03-03-PLAN.md
 Resume file: None
