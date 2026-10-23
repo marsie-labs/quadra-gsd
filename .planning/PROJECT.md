@@ -19,21 +19,19 @@ Everyone on the link sees the same four-quadrant canvas update live, and once cl
 - ✓ Session is accessible via shareable link only (no accounts/login); anyone with link can join; unknown link shows not-found — Phase 1
 - ✓ On first visit, participant is prompted for a display name, remembered in their browser across reloads — Phase 1
 - ✓ App runs locally with documented setup (env vars, migrations, single worker); startup check proves DB change events reach the Python server — Phase 1
+- ✓ Participant's display name is used as card author (server-side, never from the request) — Phase 2
+- ✓ Server holds a supabase-py Realtime subscription on the cards table and relays changes to every browser on that session, including direct DB edits — Phase 2
+- ✓ Participant can add a text card to any quadrant (trimmed, 1-500 code points, enforced in UI, service and DB) — Phase 2
+- ✓ Every card stores metadata: quadrant ID, order index, author, created/updated timestamps, deleted timestamp — Phase 2
+- ✓ Card changes broadcast to all clients via Supabase Realtime events, no polling; canvases resync after browser reconnect or server restart — Phase 2
 
 ### Active
 
-**Intent 1 — Workspace and realtime canvas initialization**
-- [ ] Participant's display name is used as card author
-- [ ] Server holds supabase-py Realtime subscriptions on workspace/card tables and relays changes to all connected browsers on that session (session init and modification) — connection proven in Phase 1; relay to browsers pending
-
 **Intent 2 — Realtime collaborative boundary management**
-- [ ] Participant can add a text card to any quadrant
 - [ ] Participant can edit a card's text
 - [ ] Participant can soft-delete a card
 - [ ] Participant can move a card to another quadrant via a move menu/buttons (no drag-and-drop in v1)
 - [ ] Participant can reorder cards within a quadrant (order index preserved)
-- [ ] Every card stores metadata: quadrant ID, order index, author (display name), created/updated timestamps, deleted flag/timestamp
-- [ ] Card mutations broadcast to all clients on the session via Supabase Realtime events — no custom polling loops
 - [ ] UI feels smooth under light latency: optimistic local update or quick confirmation in NiceGUI
 
 **Intent 3 — Explicit session closure and on-demand agent retrieval**
@@ -84,8 +82,8 @@ Everyone on the link sees the same four-quadrant canvas update live, and once cl
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | FastAPI + NiceGUI | Python end-to-end; NiceGUI runs on FastAPI and is server-driven over WebSocket | ✓ Good — Phase 1 skeleton works; launcher hard-codes a single worker |
-| Python relays Realtime to browsers (supabase-py server-side) | Python stays single gateway; browsers never hold Supabase keys | ✓ Connection proven — startup nonce round trip verified (Phase 1); browser relay lands in Phase 2 |
-| Sticky-note cards per quadrant | Matches workshop practice; supports add/edit/move/delete | — Pending |
+| Python relays Realtime to browsers (supabase-py server-side) | Python stays single gateway; browsers never hold Supabase keys | ✓ Good — one global subscription fanned out per workspace; live in ~1 s across browsers (UAT, Phase 2) |
+| Sticky-note cards per quadrant | Matches workshop practice; supports add/edit/move/delete | ✓ Add shipped (Phase 2); edit/move/delete pending Phase 3 |
 | Anyone with link can close session | No auth model; confirmation dialog guards accidents | — Pending |
 | Display name on join (browser-remembered) | Author identifier without accounts | ✓ Good — inline banner, 1-year session cookie, never overwrites a stored name (Phase 1) |
 | Closed is terminal, no reopen | Agent always sees stable final snapshot | — Pending |
@@ -96,6 +94,10 @@ Everyone on the link sees the same four-quadrant canvas update live, and once cl
 | Workspace invariants (atomic create, name length) enforced in Postgres | Agent relies on DB-level integrity, not UI checks | ✓ Good — UI/service/DB name-length parity proven live (Phase 1) |
 | Retry session creation once, only on unique-violation 23505 | Token collision is the only retryable failure; others must surface | ✓ Good (Phase 1) |
 | Home create is single-shot (re-entrancy guard, locked until navigation) | Double Enter/click created duplicate sessions | ✓ Good — confirmed in UAT (Phase 1) |
+| Card times shown as HH:MM in server local zone, full timestamp on hover | Simple for local v1; no timezone negotiation | ✓ Good (Phase 2); caveat for cross-timezone teams |
+| Snapshot on page open and every reconnect, buffered events replayed through a stale `updated_at` guard | Missed Realtime events must never leave a stale canvas or undo newer changes | ✓ Good — offline/online and server-restart UAT passed (Phase 2) |
+| Hub supervisor with single-flight recovery (1-30 s backoff); canvases resync only after the nonce probe re-proves change capture | Silent dead subscriptions would look live | ✓ Good (Phase 2); depends on realtime 2.33 private `_listen_task`, guarded by a test |
+| Author name already in effect wins over a late dialog entry (multi-tab backstop) | One browser = one display name | ✓ Good — confirmed in UAT (Phase 2) |
 
 ## Evolution
 
@@ -115,4 +117,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-22 after Phase 1*
+*Last updated: 2026-10-23 after Phase 2*
