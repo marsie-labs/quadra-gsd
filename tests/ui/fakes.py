@@ -26,7 +26,8 @@ _KINDS = ("IS", "IS_NOT", "DOES", "DOES_NOT")
 class FakeRepository:
     """Mimics ``Repository`` including the DB CHECK constraints and unique session_id.
 
-    ``create_gate`` (an unset ``asyncio.Event``) holds a create in flight for the double-trigger tests.
+    ``create_gate`` (an unset ``asyncio.Event``) holds a create in flight for the
+    double-trigger tests.
     """
 
     def __init__(self) -> None:
