@@ -103,20 +103,23 @@ Plans:
   4. Participant can reorder a card up/down within its quadrant; order matches across clients and after reload
   5. The acting participant sees their change instantly with no duplicate or flicker when the Realtime echo arrives; a failed write rolls back with a message
 
-**Plans:** 4 plans
+**Plans:** 5 plans
 
 Plans:
 **Wave 1**
-- [ ] 03-01-PLAN.md — Tracer: inline edit in browser A stored in hosted Supabase ([BLOCKING] text_updated_at + cards_touch trigger migration push) and shown live with "(edited)" in browser B; in-place optimistic projection, rollback, CardGone
+- [ ] 03-01-PLAN.md — Tracer: inline edit in browser A stored in hosted Supabase ([BLOCKING] text_updated_at + cards_touch trigger migration push) and shown live with "(edited)" in browser B; in-place optimistic projection; README migration row
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 03-02-PLAN.md — Edit interaction: card menu with Edit, Enter / Shift+Enter / blur / Esc, unchanged and invalid text, per-card re-entrancy, no name needed; open drafts survive remote edits, resyncs and moves (D-04), last save wins
+- [ ] 03-02-PLAN.md — Edit slice edges: trigger-mirroring fake, validation, rollback, CardGone (card deleted meanwhile), no duplicate or rebuild on echo; trigger timestamp rules and edit scoping proven against hosted Supabase
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 03-03-PLAN.md — Delete (instant, "Card deleted", soft, idempotent) and Move to another quadrant (end of target) with optimistic rollback; live propagation, concurrent deletes, cross-session move refused
+- [ ] 03-03-PLAN.md — Edit interaction: card menu with Edit, Enter / Shift+Enter / blur / Esc, unchanged and invalid text, per-card re-entrancy, no name needed; open drafts survive remote edits, resyncs and moves (D-04), last save wins
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 03-04-PLAN.md — Reorder up/down (one-row midpoint writes, disabled edges, full D-07 menu), live convergence across clients and reloads, README "Editing cards"
+- [ ] 03-04-PLAN.md — Delete (instant, "Card deleted", soft, idempotent) and Move to another quadrant (end of target) with optimistic rollback; live propagation, concurrent deletes, cross-session move refused
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 03-05-PLAN.md — Reorder up/down (one-row midpoint writes, disabled edges, full D-07 menu), live convergence across clients and reloads, README "Editing cards"
 
 **UI hint**: yes
 
