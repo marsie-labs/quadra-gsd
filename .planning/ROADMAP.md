@@ -103,11 +103,11 @@ Plans:
   4. Participant can reorder a card up/down within its quadrant; order matches across clients and after reload
   5. The acting participant sees their change instantly with no duplicate or flicker when the Realtime echo arrives; a failed write rolls back with a message
 
-**Plans:** 5 plans
+**Plans:** 1/5 plans executed
 
 Plans:
 **Wave 1**
-- [ ] 03-01-PLAN.md — Tracer: inline edit in browser A stored in hosted Supabase ([BLOCKING] text_updated_at + cards_touch trigger migration push) and shown live with "(edited)" in browser B; in-place optimistic projection; README migration row
+- [x] 03-01-PLAN.md — Tracer: inline edit in browser A stored in hosted Supabase ([BLOCKING] text_updated_at + cards_touch trigger migration push) and shown live with "(edited)" in browser B; in-place optimistic projection; README migration row
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 03-02-PLAN.md — Edit slice edges: trigger-mirroring fake, validation, rollback, CardGone (card deleted meanwhile), no duplicate or rebuild on echo; trigger timestamp rules and edit scoping proven against hosted Supabase
@@ -161,6 +161,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Session Skeleton | 7/7 | Complete    | 2026-10-22 |
 | 2. Live Shared Canvas | 5/5 | Complete    | 2026-10-23 |
-| 3. Card Editing | 0/4 | Planned | - |
+| 3. Card Editing | 1/5 | In Progress | - |
 | 4. Session Close & Lock | 0/TBD | Not started | - |
 | 5. Agent Results & E2E | 0/TBD | Not started | - |
