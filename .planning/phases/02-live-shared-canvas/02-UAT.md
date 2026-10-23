@@ -36,12 +36,16 @@ result: [pending]
 expected: Cancel keeps the text and writes nothing; Continue stores 'name · HH:MM' and removes the banner; 'Card text is required (max 500 characters)' appears under that field only; one card appears on double-click.
 result: [pending]
 
+### 6. Multi-tab author backstop (02-02 truth). In one browser open the session in tab A and tab B, both unnamed. In A type a card and Add so the name dialog opens; in B save the name "Zed"; back in A enter "Amy" and Continue.
+expected: The stored and shown author is "Zed" (the name already in effect), not "Amy".
+result: [pending]
+
 ## Summary
 
-total: 5
+total: 6
 passed: 0
 issues: 0
-pending: 5
+pending: 6
 skipped: 0
 blocked: 0
 
