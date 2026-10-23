@@ -6,6 +6,8 @@ request, so when two browsers are open the acting (named) browser is opened last
 
 from datetime import datetime
 
+import pytest
+
 from app.deps import get_services
 from app.ui.canvas_view import format_card_time
 from tests.ui.fakes import (
@@ -139,3 +141,98 @@ async def test_listener_unregistered_when_client_deleted(user):
 
     user.client.delete()
     assert hub.listener_count(workspace_id) == 0
+
+
+ERROR = "Card text is required (max 500 characters)"
+
+
+async def _add(browser, kind: str, text: str | None = None) -> None:
+    if text is not None:
+        browser.find(marker=f"add-input-{kind}").clear().type(text)
+    browser.find(marker=f"add-button-{kind}").click()
+
+
+@pytest.mark.parametrize("text", [None, "   "], ids=["empty", "spaces"])
+async def test_blank_text_shows_inline_error_and_writes_nothing(user, text):
+    repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
+    await user.open(PATH_A)
+    await _save_name(user, "Ann")
+
+    await _add(user, "IS", text)
+
+    with user.scope(marker="quadrant-IS"):
+        await user.should_see(ERROR)
+    with user.scope(marker="quadrant-DOES"):
+        await user.should_not_see(ERROR)
+    assert repo.insert_calls == 0
+    assert _card_texts(user, "IS") == []
+
+
+async def test_oversized_text_shows_inline_error_and_writes_nothing(user):
+    repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
+    await user.open(PATH_A)
+    await _save_name(user, "Ann")
+
+    await _add(user, "IS", "a" * 501)
+
+    with user.scope(marker="quadrant-IS"):
+        await user.should_see(ERROR)
+    assert repo.insert_calls == 0
+
+
+async def test_unnamed_invalid_text_never_opens_the_name_dialog(user):
+    repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
+    await user.open(PATH_A)
+
+    await _add(user, "IS", "   ")
+
+    with user.scope(marker="quadrant-IS"):
+        await user.should_see(ERROR)
+    await user.should_not_see("Enter your name to continue")
+    assert repo.insert_calls == 0
+
+
+async def test_500_code_points_are_stored_and_shown(user):
+    repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
+    await user.open(PATH_A)
+    await _save_name(user, "Ann")
+
+    await _add(user, "IS", "é" * 500)
+
+    with user.scope(marker="cards-IS"):
+        await user.should_see("é" * 500, retries=50)
+    assert repo.insert_calls == 1
+    assert _card_texts(user, "IS") == ["é" * 500]
+
+
+async def test_error_clears_on_typing_and_after_a_successful_add(user):
+    install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
+    await user.open(PATH_A)
+    await _save_name(user, "Ann")
+
+    await _add(user, "IS", "   ")
+    with user.scope(marker="quadrant-IS"):
+        await user.should_see(ERROR)
+
+    user.find(marker="add-input-IS").clear().type("Valid idea")
+    with user.scope(marker="quadrant-IS"):
+        await user.should_not_see(ERROR)
+
+    await _add(user, "IS")
+    with user.scope(marker="cards-IS"):
+        await user.should_see("Valid idea", retries=50)
+    field = next(iter(user.find(marker="add-input-IS").elements))
+    assert field.value == ""
+    with user.scope(marker="quadrant-IS"):
+        await user.should_not_see(ERROR)
+
+
+async def test_card_text_and_author_render_literally(user):
+    repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
+    row = seed_card(repo, SEEDED_ID_A, "IS", "<b>x</b>", author="Zoë 🙂")
+
+    await user.open(PATH_A)
+
+    assert _card_texts(user, "IS") == ["<b>x</b>"]
+    expected = format_card_time(datetime.fromisoformat(row["created_at"]))
+    await user.should_see(marker="card-meta", content=f"Zoë 🙂 · {expected}")
