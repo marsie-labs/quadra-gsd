@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 02
 current_phase_name: Live Shared Canvas
 status: executing
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-10-23T11:17:28.999Z"
+stopped_at: Completed 02-03-PLAN.md
+last_updated: "2026-10-23T11:25:33.635Z"
 last_activity: 2026-10-23
 last_activity_desc: Phase 02 execution started
-state_head: d601ddbc15988da046204cdca3b229dbf9cc8bfd
+state_head: 13f9b7a60bf45406f25d1730e7750d53367a15a1
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 12
-  completed_plans: 9
+  completed_plans: 10
   percent: 20
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-22)
 ## Current Position
 
 Phase: 02 (Live Shared Canvas) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-10-23 — Phase 02 execution started
 
@@ -64,6 +64,7 @@ Progress: [██░░░░░░░░] 20%
 | Phase 01 P06 | 2 min | 2 tasks | 8 files |
 | Phase 02 P01 | 6 min | 2 tasks | 12 files |
 | Phase 02 P02 | 33 min | 3 tasks | 11 files |
+| Phase 02 P03 | 5 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -90,6 +91,8 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-01: NiceGUI test plugin runs click handlers under the most recently opened request's storage; multi-browser UI tests open the acting (named) browser last
 - [Phase 02]: 02-02: card text trimmed then counted in code points (1-500); no browser-side length limit on the add field (UTF-16 vs code points); text validated before the name gate
 - [Phase 02]: 02-02: banner reference kept in canvas_page so naming via the add dialog removes the inline banner; deletions guarded with is_deleted (WR-06)
+- [Phase 02]: 02-03: hosted DELETE events carry only old_record.id (RLS on); DELETE needs only the id and falls back to telling every open canvas
+- [Phase 02]: 02-03: apply_card is a full-row projection with stale updated_at guard (older ignored, equal applies); remove_card drops state before refreshing the hint
 
 ### Pending Todos
 
@@ -109,6 +112,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-23T11:17:28.935Z
-Stopped at: Completed 02-02-PLAN.md
+Last session: 2026-10-23T11:25:33.565Z
+Stopped at: Completed 02-03-PLAN.md
 Resume file: None

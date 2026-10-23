@@ -28,7 +28,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **CARD-03**: Participant can delete a card (soft-delete: gone for everyone, kept in DB)
 - [ ] **CARD-04**: Participant can move a card to another quadrant via a move menu
 - [ ] **CARD-05**: Participant can reorder a card within its quadrant via up/down controls
-- [ ] **CARD-06**: Each card shows its author's name and time
+- [x] **CARD-06**: Each card shows its author's name and time
 - [x] **CARD-07**: Each card stores quadrant, order index, author, created/updated timestamps, deleted timestamp
 - [ ] **CARD-08**: Participant's own actions appear instantly with no duplicates when confirmation arrives; failed writes roll back with a message
 
@@ -36,7 +36,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [ ] **SYNC-01**: A card change by one participant appears for all others on the session within ~1s
 - [ ] **SYNC-02**: Updates are delivered via Supabase Realtime events relayed by the Python server (no polling)
-- [ ] **SYNC-03**: Changes made directly in the database (outside the app) also appear live
+- [x] **SYNC-03**: Changes made directly in the database (outside the app) also appear live
 - [ ] **SYNC-04**: After a browser reconnect or server restart, the client shows current state
 
 ### Close
@@ -115,11 +115,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | IDEN-03 | Phase 2 | Complete |
 | QUAL-04 | Phase 1 | Complete |
 | CARD-01 | Phase 2 | Complete |
-| CARD-06 | Phase 2 | Pending |
+| CARD-06 | Phase 2 | Complete |
 | CARD-07 | Phase 2 | Complete |
 | SYNC-01 | Phase 2 | Pending |
 | SYNC-02 | Phase 2 | Pending |
-| SYNC-03 | Phase 2 | Pending |
+| SYNC-03 | Phase 2 | Complete |
 | SYNC-04 | Phase 2 | Pending |
 | QUAL-02 | Phase 2 | Pending |
 | CARD-02 | Phase 3 | Pending |
