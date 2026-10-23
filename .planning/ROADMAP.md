@@ -103,7 +103,7 @@ Plans:
   4. Participant can reorder a card up/down within its quadrant; order matches across clients and after reload
   5. The acting participant sees their change instantly with no duplicate or flicker when the Realtime echo arrives; a failed write rolls back with a message
 
-**Plans:** 4/5 plans executed
+**Plans:** 5/5 plans executed
 
 Plans:
 **Wave 1**
@@ -119,7 +119,7 @@ Plans:
 - [x] 03-04-PLAN.md — Delete (instant, "Card deleted", soft, idempotent) and Move to another quadrant (end of target) with optimistic rollback; live propagation, concurrent deletes, cross-session move refused
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 03-05-PLAN.md — Reorder up/down (one-row midpoint writes, disabled edges, full D-07 menu), live convergence across clients and reloads, README "Editing cards"
+- [x] 03-05-PLAN.md — Reorder up/down (one-row midpoint writes, disabled edges, full D-07 menu), live convergence across clients and reloads, README "Editing cards"
 
 **UI hint**: yes
 
@@ -161,6 +161,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Session Skeleton | 7/7 | Complete    | 2026-10-22 |
 | 2. Live Shared Canvas | 5/5 | Complete    | 2026-10-23 |
-| 3. Card Editing | 4/5 | In Progress | - |
+| 3. Card Editing | 5/5 | In Progress | - |
 | 4. Session Close & Lock | 0/TBD | Not started | - |
 | 5. Agent Results & E2E | 0/TBD | Not started | - |

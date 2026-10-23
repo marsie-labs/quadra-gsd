@@ -27,10 +27,10 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **CARD-02**: Participant can edit a card's text
 - [x] **CARD-03**: Participant can delete a card (soft-delete: gone for everyone, kept in DB)
 - [x] **CARD-04**: Participant can move a card to another quadrant via a move menu
-- [ ] **CARD-05**: Participant can reorder a card within its quadrant via up/down controls
+- [x] **CARD-05**: Participant can reorder a card within its quadrant via up/down controls
 - [x] **CARD-06**: Each card shows its author's name and time
 - [x] **CARD-07**: Each card stores quadrant, order index, author, created/updated timestamps, deleted timestamp
-- [ ] **CARD-08**: Participant's own actions appear instantly with no duplicates when confirmation arrives; failed writes roll back with a message
+- [x] **CARD-08**: Participant's own actions appear instantly with no duplicates when confirmation arrives; failed writes roll back with a message
 
 ### Sync
 
@@ -125,8 +125,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CARD-02 | Phase 3 | Complete |
 | CARD-03 | Phase 3 | Complete |
 | CARD-04 | Phase 3 | Complete |
-| CARD-05 | Phase 3 | Pending |
-| CARD-08 | Phase 3 | Pending |
+| CARD-05 | Phase 3 | Complete |
+| CARD-08 | Phase 3 | Complete |
 | CLOS-01 | Phase 4 | Pending |
 | CLOS-02 | Phase 4 | Pending |
 | CLOS-03 | Phase 4 | Pending |
