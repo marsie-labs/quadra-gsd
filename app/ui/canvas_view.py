@@ -24,6 +24,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, tzinfo
+from typing import Literal
 
 from nicegui import background_tasks, ui
 
@@ -34,6 +35,7 @@ from app.services.sessions import (
     CardGone,
     InvalidCardText,
     next_order_index,
+    reorder_index,
     validate_card_text,
 )
 from app.ui.identity import ensure_display_name
@@ -83,6 +85,7 @@ class _CardWidgets:
     menu_button: ui.button
     menu: ui.menu
     move_items: dict[str, ui.element]  # quadrant kind -> its "Move to" item
+    reorder_items: dict[str, ui.element]  # "up" / "down" -> its menu item (D-10 enabled state)
 
 
 @dataclass(slots=True)
@@ -254,7 +257,7 @@ class CanvasView:
                     with (
                         ui.button(icon="more_vert").props("flat round dense").mark("card-menu")
                     ) as menu_button:
-                        menu, move_items = self._build_menu(card_id)
+                        menu, move_items, reorder_items = self._build_menu(card_id)
                     # Item assignment, never the props string parser: the text is user input.
                     menu_button.props["aria-label"] = menu_label(row.text)
         return _CardWidgets(
@@ -266,15 +269,21 @@ class CanvasView:
             menu_button=menu_button,
             menu=menu,
             move_items=move_items,
+            reorder_items=reorder_items,
         )
 
-    def _build_menu(self, card_id: str) -> tuple[ui.menu, dict[str, ui.element]]:
+    def _build_menu(
+        self, card_id: str
+    ) -> tuple[ui.menu, dict[str, ui.element], dict[str, ui.element]]:
         """The card's actions, in the order D-07 fixes. Must be called inside the menu button.
 
         Move to is a submenu so the top-level menu keeps its shape; its items are returned by
-        quadrant kind so ``_render`` can hide the one for the card's current quadrant.
+        quadrant kind so ``_render`` can hide the one for the card's current quadrant. Move up and
+        Move down are returned by direction so ``_refresh_quadrant`` can disable them at the ends
+        (D-10): they stay in the menu.
         """
         move_items: dict[str, ui.element] = {}
+        reorder_items: dict[str, ui.element] = {}
         # no-refocus: closing the menu must not give focus back to the button while the editor
         # that Edit just opened is taking it.
         with ui.menu().props("no-refocus") as menu:
@@ -296,10 +305,17 @@ class CanvasView:
                         move_items[quadrant.kind] = ui.menu_item(
                             QUADRANT_LABELS[quadrant.kind], on_click=choose
                         ).mark(f"card-action-move-{quadrant.kind}")
+            for direction, label in (("up", "Move up"), ("down", "Move down")):
+                reorder_items[direction] = ui.menu_item(
+                    label,
+                    on_click=lambda _, card_id=card_id, direction=direction: self._reorder_card(
+                        card_id, direction
+                    ),
+                ).mark(f"card-action-{direction}")
             ui.menu_item(
                 "Delete", on_click=lambda _, card_id=card_id: self._delete_card(card_id)
             ).mark("card-action-delete")
-        return menu, move_items
+        return menu, move_items, reorder_items
 
     def _render(self, card_id: str) -> None:
         """Make the page match ``_shown(card_id)``: create, update in place, reposition or drop."""
@@ -310,7 +326,7 @@ class CanvasView:
             if widgets is not None:
                 del self._widgets[card_id]
                 widgets.card.delete()
-                self._refresh_hint(widgets.quadrant_id)
+                self._refresh_quadrant(widgets.quadrant_id)
             return
         container = self._lists.get(shown.quadrant_id)
         if container is None:
@@ -329,15 +345,7 @@ class CanvasView:
             if widgets.menu_button.props.get("aria-label") != label:
                 widgets.menu_button.props["aria-label"] = label
 
-        ordered = sorted(
-            (
-                row
-                for other_id in self._widgets
-                if (row := self._shown(other_id)) is not None
-                and row.quadrant_id == shown.quadrant_id
-            ),
-            key=card_sort_key,
-        )
+        ordered = self._quadrant_cards(shown.quadrant_id)
         index = next(i for i, row in enumerate(ordered) if row.id == card_id)
         siblings = list(container.default_slot.children)
         if index >= len(siblings) or siblings[index] is not widgets.card:
@@ -347,8 +355,9 @@ class CanvasView:
             item.set_visibility(kind != current_kind)  # only the other quadrants are offered
         old_quadrant_id = widgets.quadrant_id
         widgets.quadrant_id = shown.quadrant_id
-        self._refresh_hint(old_quadrant_id)
-        self._refresh_hint(shown.quadrant_id)
+        self._refresh_quadrant(old_quadrant_id)
+        if shown.quadrant_id != old_quadrant_id:
+            self._refresh_quadrant(shown.quadrant_id)
 
     async def _write(
         self,
@@ -455,6 +464,27 @@ class CanvasView:
             lambda: get_services().sessions.move_card(self.workspace_id, card_id, quadrant_id),
             MOVE_FAILED,
             "move_card",
+        )
+
+    async def _reorder_card(self, card_id: str, direction: Literal["up", "down"]) -> None:
+        """Move up / Move down from the card's menu: no name needed (D-05).
+
+        The card swaps with its neighbour before the write returns, at the position the service
+        will most likely store (the same ``reorder_index`` on what is shown); the confirmed row
+        replaces it (``_write``). At an edge there is nothing to do and nothing is written."""
+        shown = self._shown(card_id)
+        if shown is None or card_id in self._busy:
+            return
+        ordered = [(row.id, row.order_index) for row in self._quadrant_cards(shown.quadrant_id)]
+        value = reorder_index(ordered, card_id, direction)
+        if value is None:
+            return
+        await self._write(
+            card_id,
+            shown.model_copy(update={"order_index": value}),
+            lambda: get_services().sessions.reorder_card(self.workspace_id, card_id, direction),
+            MOVE_FAILED,
+            "reorder_card",
         )
 
     def _start_edit(self, card_id: str) -> None:
@@ -607,6 +637,30 @@ class CanvasView:
     def request_resync(self) -> None:
         """Schedule ``resync()`` in the background. Plain def: callable from sync event code."""
         background_tasks.create(self.resync(), name=f"canvas resync {self.workspace_id}")
+
+    def _quadrant_cards(self, quadrant_id: str) -> list[CardView]:
+        """The rows shown in a quadrant (optimistic over server) in display order."""
+        return sorted(
+            (
+                row
+                for card_id in self._widgets
+                if (row := self._shown(card_id)) is not None and row.quadrant_id == quadrant_id
+            ),
+            key=card_sort_key,
+        )
+
+    def _refresh_quadrant(self, quadrant_id: str) -> None:
+        """Bring a quadrant's empty hint and its cards' Move up / Move down states up to date.
+
+        D-10: the first card cannot move up and the last cannot move down, so a single card has
+        both disabled. The items stay visible; every render of a card in the quadrant, local or
+        remote, re-runs this, so the states follow every change of the quadrant's order."""
+        self._refresh_hint(quadrant_id)
+        ordered = self._quadrant_cards(quadrant_id)
+        for index, row in enumerate(ordered):
+            widgets = self._widgets[row.id]
+            widgets.reorder_items["up"].set_enabled(index > 0)
+            widgets.reorder_items["down"].set_enabled(index < len(ordered) - 1)
 
     def _refresh_hint(self, quadrant_id: str) -> None:
         has_cards = any(w.quadrant_id == quadrant_id for w in self._widgets.values())

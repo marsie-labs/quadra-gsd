@@ -131,6 +131,42 @@ class Repository:
             workspace_id, card_id, {"quadrant_id": quadrant_id, "order_index": order_index}
         )
 
+    async def get_card(self, *, workspace_id: str, card_id: str) -> dict[str, Any] | None:
+        """One live card of one workspace, or None (unknown, deleted or another session's)."""
+        resp = await (
+            self._client.table("cards")
+            .select(CARD_COLUMNS)
+            .eq("id", card_id)
+            .eq("workspace_id", workspace_id)
+            .is_("deleted_at", "null")
+            .maybe_single()
+            .execute()
+        )
+        # maybe_single() returns None (not an empty response) when no row matches.
+        if resp is None:
+            return None
+        return resp.data
+
+    async def list_quadrant_order(self, quadrant_id: str) -> list[dict[str, Any]]:
+        """id, order_index and created_at of a quadrant's live cards in display order."""
+        resp = await (
+            self._client.table("cards")
+            .select("id, order_index, created_at")
+            .eq("quadrant_id", quadrant_id)
+            .is_("deleted_at", "null")
+            .order("order_index")
+            .order("created_at")
+            .order("id")
+            .execute()
+        )
+        return resp.data
+
+    async def set_card_order(
+        self, *, workspace_id: str, card_id: str, order_index: float
+    ) -> dict[str, Any] | None:
+        """Change only a card's order_index: exactly one row is written, never a renumber."""
+        return await self._update_live_card(workspace_id, card_id, {"order_index": order_index})
+
     async def max_order_index(self, quadrant_id: str) -> float | None:
         """Highest order_index among the quadrant's live cards, or None when it has none."""
         resp = await (

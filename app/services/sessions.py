@@ -1,6 +1,8 @@
 """Session domain service. Pages call this; they never touch the repository or any key."""
 
 import logging
+from collections.abc import Sequence
+from typing import Literal
 
 from postgrest.exceptions import APIError
 
@@ -25,6 +27,39 @@ def next_order_index(current_max: float | None) -> float:
     if current_max is None:
         return ORDER_GAP
     return current_max + ORDER_GAP
+
+
+def reorder_index(
+    ordered: Sequence[tuple[str, float]], card_id: str, direction: Literal["up", "down"]
+) -> float | None:
+    """The order_index that moves ``card_id`` one place up or down, or None for "nothing to do".
+
+    ``ordered`` is the quadrant's live cards in display order as (id, order_index) pairs. The card
+    must land between the neighbour it passes and the next card beyond it with a strictly
+    different order_index, so a card tied with others passes the whole tie group (ties sort by
+    created_at and id, which this rule cannot change). At the top or bottom the new value is the
+    neighbour's order_index minus or plus ORDER_GAP. Nothing is renumbered.
+
+    None when the card is absent, already first (up) or last (down), or no double lies strictly
+    between the two bounds (precision exhausted).
+    """
+    position = next((i for i, (other_id, _) in enumerate(ordered) if other_id == card_id), None)
+    if position is None:
+        return None
+    step = -1 if direction == "up" else 1
+    neighbour = position + step
+    if not 0 <= neighbour < len(ordered):
+        return None
+    passed = ordered[neighbour][1]
+    beyond = neighbour + step
+    while 0 <= beyond < len(ordered) and ordered[beyond][1] == passed:
+        beyond += step
+    if not 0 <= beyond < len(ordered):
+        return passed - ORDER_GAP if direction == "up" else passed + ORDER_GAP
+    far = ordered[beyond][1]
+    low, high = (far, passed) if direction == "up" else (passed, far)
+    value = (low + high) / 2
+    return value if low < value < high else None
 
 
 class InvalidProjectName(ValueError):
@@ -172,6 +207,36 @@ class SessionService:
         if row is None:
             raise CardGone(card_id)
         return CardView.model_validate(row)
+
+    async def reorder_card(
+        self, workspace_id: str, card_id: str, direction: Literal["up", "down"]
+    ) -> CardView:
+        """Move a card one place up or down in its quadrant by writing ONE row (CARD-05).
+
+        The new position is computed from the database's current order of the quadrant, never
+        from what a browser shows. Nothing is written when the card is already first (up) or last
+        (down) there, or when no double fits between its new neighbours: the card is returned
+        unchanged. The quadrant is never renumbered. Raises CardGone when the card is missing,
+        deleted or in another session. No author: anyone may reorder any card (D-05).
+        """
+        if direction not in ("up", "down"):
+            raise ValueError(f"unknown direction: {direction!r}")
+        row = await self._repository.get_card(workspace_id=workspace_id, card_id=card_id)
+        if row is None:
+            raise CardGone(card_id)
+        ordered = [
+            (r["id"], float(r["order_index"]))
+            for r in await self._repository.list_quadrant_order(row["quadrant_id"])
+        ]
+        value = reorder_index(ordered, card_id, direction)
+        if value is None:
+            return CardView.model_validate(row)
+        moved = await self._repository.set_card_order(
+            workspace_id=workspace_id, card_id=card_id, order_index=value
+        )
+        if moved is None:
+            raise CardGone(card_id)
+        return CardView.model_validate(moved)
 
     async def list_cards(self, workspace_id: str) -> list[CardView]:
         rows = await self._repository.list_cards(workspace_id)
