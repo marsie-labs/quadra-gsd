@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 EDIT_FAILED = "Could not save the card. Please try again."
 CARD_GONE = "This card was deleted."
+MENU_LABEL_CODE_POINTS = 40
 
 
 def format_card_time(moment: datetime, tz: tzinfo | None = None) -> str:
@@ -56,6 +57,11 @@ def card_meta_text(card: CardView, tz: tzinfo | None = None) -> str:
     return meta
 
 
+def menu_label(text: str) -> str:
+    """Accessible name of a card's menu button: its first 40 code points tell cards apart."""
+    return "Card actions: " + text[:MENU_LABEL_CODE_POINTS]
+
+
 @dataclass(slots=True)
 class _CardWidgets:
     """The elements of one shown card. A bundle exists exactly while the card is shown."""
@@ -65,6 +71,8 @@ class _CardWidgets:
     meta: ui.label
     row: ui.row
     quadrant_id: str
+    menu_button: ui.button
+    menu: ui.menu
 
 
 @dataclass(slots=True)
@@ -226,9 +234,32 @@ class CanvasView:
                         .mark("card-meta")
                         .tooltip(format_card_timestamp(row.created_at))
                     )
+                    # One always-visible button (no hover-only control, works on touch).
+                    with (
+                        ui.button(icon="more_vert").props("flat round dense").mark("card-menu")
+                    ) as menu_button:
+                        menu = self._build_menu(card_id)
+                    # Item assignment, never the props string parser: the text is user input.
+                    menu_button.props["aria-label"] = menu_label(row.text)
         return _CardWidgets(
-            card=card, text=text, meta=meta, row=meta_row, quadrant_id=row.quadrant_id
+            card=card,
+            text=text,
+            meta=meta,
+            row=meta_row,
+            quadrant_id=row.quadrant_id,
+            menu_button=menu_button,
+            menu=menu,
         )
+
+    def _build_menu(self, card_id: str) -> ui.menu:
+        """The card's actions, in the order D-07 fixes. Must be called inside the menu button."""
+        # no-refocus: closing the menu must not give focus back to the button while the editor
+        # that Edit just opened is taking it.
+        with ui.menu().props("no-refocus") as menu:
+            ui.menu_item(
+                "Edit", on_click=lambda _, card_id=card_id: self._start_edit(card_id)
+            ).mark("card-action-edit")
+        return menu
 
     def _render(self, card_id: str) -> None:
         """Make the page match ``_shown(card_id)``: create, update in place, reposition or drop."""
@@ -254,6 +285,9 @@ class CanvasView:
             meta = card_meta_text(shown)
             if widgets.meta.text != meta:
                 widgets.meta.text = meta
+            label = menu_label(shown.text)
+            if widgets.menu_button.props.get("aria-label") != label:
+                widgets.menu_button.props["aria-label"] = label
 
         ordered = sorted(
             (
@@ -292,6 +326,9 @@ class CanvasView:
         if card_id in self._busy:
             return
         self._busy.add(card_id)
+        busy_widgets = self._widgets.get(card_id)
+        if busy_widgets is not None:
+            busy_widgets.menu_button.disable()
         try:
             if optimistic is not None:
                 self._optimistic[card_id] = optimistic
@@ -318,6 +355,9 @@ class CanvasView:
             self._render(card_id)
         finally:
             self._busy.discard(card_id)
+            widgets = self._widgets.get(card_id)
+            if widgets is not None:
+                widgets.menu_button.enable()
 
     def _start_edit(self, card_id: str) -> None:
         """Swap the card's text for a textarea holding it (D-01). Enter saves (D-03)."""
@@ -335,10 +375,13 @@ class CanvasView:
         editor.move(target_index=1)  # right after the text label
         widgets.text.set_visibility(False)
         editor.on_value_change(lambda _, editor=editor: setattr(editor, "error", None))
-        # Plain Enter saves; Shift+Enter keeps its default newline.
+        # Plain Enter saves; Shift+Enter keeps its default newline (the ``exact`` modifier).
+        # Clicking away saves too; Esc throws the draft away (D-03).
         editor.on(
             "keydown.enter.exact.prevent", lambda _, card_id=card_id: self._commit_edit(card_id)
         )
+        editor.on("blur", lambda _, card_id=card_id: self._commit_edit(card_id))
+        editor.on("keydown.esc", lambda _, card_id=card_id: self._cancel_edit(card_id))
         self._editing[card_id] = _EditSession(editor=editor, original=shown.text)
 
     def _close_editor(self, card_id: str) -> None:
@@ -350,7 +393,14 @@ class CanvasView:
         if widgets is not None:
             widgets.text.set_visibility(True)
 
+    def _cancel_edit(self, card_id: str) -> None:
+        """Esc: close the editor without saving and show the latest known text (D-03, D-04)."""
+        self._close_editor(card_id)
+        self._render(card_id)
+
     async def _commit_edit(self, card_id: str) -> None:
+        """Enter or blur. The open session is the done flag: whoever closes it first wins, so the
+        blur that follows Enter or Esc, and a second Enter, find nothing to do."""
         session = self._editing.get(card_id)
         shown = self._shown(card_id)
         if session is None or shown is None:
@@ -359,6 +409,12 @@ class CanvasView:
         if clean is None:
             session.editor.error = CARD_TEXT_ERROR  # the editor stays open (D-01)
             return
+        server = self._cards.get(card_id)
+        if clean == session.original or (server is not None and clean == server.text):
+            self._close_editor(card_id)  # nothing to save: no write, no optimistic change
+            return
+        if card_id in self._busy:
+            return  # a write for this card is in flight: keep the editor open
         self._close_editor(card_id)  # before any await
         optimistic = shown.model_copy(update={"text": clean, "text_updated_at": datetime.now(UTC)})
         await self._write(

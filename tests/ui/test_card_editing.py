@@ -524,9 +524,7 @@ async def test_menu_edit_item_opens_the_editor_with_the_card_text(user):
     _menu_edit(user, row["id"])
 
     assert _editor(user).value == "old text"
-    with user.scope(marker=f"card-{row['id']}"):
-        text = next(iter(user.find(marker="card-text").elements))
-    assert not text.visible
+    assert not _card_element(user, row["id"]).default_slot.children[0].visible
 
 
 async def test_editor_registers_one_exact_enter_listener_plus_esc_and_blur(user):
@@ -682,7 +680,7 @@ async def test_double_enter_in_flight_writes_once_and_guards_the_card(user):
     assert repo.update_calls == 1
     assert not _menu_button(user, row["id"]).enabled
     _open_editor(user, row["id"])  # clicking the text while the write is in flight
-    assert len(user.find(marker="card-editor").elements) == 0
+    await user.should_not_see(marker="card-editor")
 
     repo.update_gate.set()
     await _wait_for(lambda: repo.cards[row["id"]]["text"] == "new text")
