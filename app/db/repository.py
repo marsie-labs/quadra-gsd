@@ -109,6 +109,16 @@ class Repository:
         trigger and the author is never rewritten (D-05)."""
         return await self._update_live_card(workspace_id, card_id, {"text": text})
 
+    async def soft_delete_card(self, *, workspace_id: str, card_id: str) -> dict[str, Any] | None:
+        """Mark a card deleted by setting ``deleted_at``; the row stays in the table (CARD-03).
+
+        The ``deleted_at is null`` filter of ``_update_live_card`` makes a repeat match no row, so
+        the first deletion's timestamp is kept and the repeat returns None.
+        """
+        return await self._update_live_card(
+            workspace_id, card_id, {"deleted_at": datetime.now(UTC).isoformat()}
+        )
+
     async def max_order_index(self, quadrant_id: str) -> float | None:
         """Highest order_index among the quadrant's live cards, or None when it has none."""
         resp = await (

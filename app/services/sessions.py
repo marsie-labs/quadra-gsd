@@ -147,6 +147,14 @@ class SessionService:
             raise CardGone(card_id)
         return CardView.model_validate(row)
 
+    async def delete_card(self, workspace_id: str, card_id: str) -> CardView | None:
+        """Soft-delete a card. Returns the deleted row, or None when the card was already deleted
+        or is not in this session: deleting twice, or two participants at once, is not an error."""
+        row = await self._repository.soft_delete_card(workspace_id=workspace_id, card_id=card_id)
+        if row is None:
+            return None
+        return CardView.model_validate(row)
+
     async def list_cards(self, workspace_id: str) -> list[CardView]:
         rows = await self._repository.list_cards(workspace_id)
         return [CardView.model_validate(r) for r in rows]

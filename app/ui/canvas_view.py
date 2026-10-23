@@ -36,6 +36,8 @@ logger = logging.getLogger(__name__)
 
 EDIT_FAILED = "Could not save the card. Please try again."
 CARD_GONE = "This card was deleted."
+CARD_DELETED = "Card deleted"
+DELETE_FAILED = "Could not delete the card. Please try again."
 MENU_LABEL_CODE_POINTS = 40
 
 
@@ -264,6 +266,9 @@ class CanvasView:
             ui.menu_item(
                 "Edit", on_click=lambda _, card_id=card_id: self._start_edit(card_id)
             ).mark("card-action-edit")
+            ui.menu_item(
+                "Delete", on_click=lambda _, card_id=card_id: self._delete_card(card_id)
+            ).mark("card-action-delete")
         return menu
 
     def _render(self, card_id: str) -> None:
@@ -316,7 +321,7 @@ class CanvasView:
         self,
         card_id: str,
         optimistic: CardView | None,
-        call: Callable[[], Awaitable[CardView]],
+        call: Callable[[], Awaitable[CardView | None]],
         failure: str,
         operation: str,
     ) -> None:
@@ -352,6 +357,9 @@ class CanvasView:
                 ui.notify(failure, type="negative")
                 return
             self._optimistic.pop(card_id, None)
+            if row is None:
+                self._remove(card_id)  # already deleted elsewhere: the card stays gone, quietly
+                return
             if card_id in self._cards:
                 self._apply(row)
                 if self.loading:
@@ -363,6 +371,24 @@ class CanvasView:
             widgets = self._widgets.get(card_id)
             if widgets is not None:
                 widgets.menu_button.enable()
+
+    async def _delete_card(self, card_id: str) -> None:
+        """Delete from the card's menu: no dialog and no undo (D-08), no name needed (D-05).
+
+        The card leaves the page and the toast shows before the write returns; a failed write
+        brings the card back at its place with a message (``_write``)."""
+        shown = self._shown(card_id)
+        if shown is None or card_id in self._busy:
+            return
+        optimistic = shown.model_copy(update={"deleted_at": datetime.now(UTC)})
+        ui.notify(CARD_DELETED)
+        await self._write(
+            card_id,
+            optimistic,
+            lambda: get_services().sessions.delete_card(self.workspace_id, card_id),
+            DELETE_FAILED,
+            "delete_card",
+        )
 
     def _start_edit(self, card_id: str) -> None:
         """Swap the card's text for a textarea holding it (D-01). Enter saves (D-03)."""
