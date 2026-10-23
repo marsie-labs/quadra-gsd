@@ -52,8 +52,29 @@ async def test_db_enforces_author_length_like_validate_display_name(
             await _insert(supabase_client, workspace_id, quadrant_id, "a" * 41)
         assert too_long.value.code == "23514"
 
+        with pytest.raises(APIError) as blank:
+            await _insert(supabase_client, workspace_id, quadrant_id, "   ")
+        assert blank.value.code == "23514"
+
         author = "é" * 40
         result = await _insert(supabase_client, workspace_id, quadrant_id, author)
         assert result.data[0]["author"] == author
     finally:
         await supabase_client.table("cards").delete().eq("workspace_id", workspace_id).execute()
+
+
+async def test_db_rejects_space_only_closed_by(supabase_client, created_session_ids):
+    """The same rule for workspaces.closed_by; the workspace stays open, so only the CHECK fires."""
+    repo = Repository(supabase_client)
+    sid = new_session_id()
+    await repo.create_session("IT blank closer " + secrets.token_hex(4), sid)
+    created_session_ids.append(sid)
+
+    with pytest.raises(APIError) as blank:
+        await (
+            supabase_client.table("workspaces")
+            .update({"closed_by": "   "})
+            .eq("session_id", sid)
+            .execute()
+        )
+    assert blank.value.code == "23514"
