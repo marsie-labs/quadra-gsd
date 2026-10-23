@@ -30,7 +30,9 @@ class FakeRepository:
 
     ``create_gate`` (an unset ``asyncio.Event``) holds a create in flight for the
     double-trigger tests; ``insert_gate`` does the same for a card insert. The
-    ``fail_next_*_codes`` lists make the next write raise an ``APIError`` with that code.
+    ``fail_next_*_codes`` lists make the next call raise an ``APIError`` with that code.
+    ``list_gate`` holds a card read AFTER its rows are computed, so a held read returns a
+    snapshot older than whatever happens meanwhile; ``list_calls`` counts card reads.
     """
 
     def __init__(self) -> None:
@@ -43,6 +45,10 @@ class FakeRepository:
         self.insert_calls = 0
         self.insert_gate: asyncio.Event | None = None
         self.fail_next_insert_codes: list[str] = []
+        self.list_calls = 0
+        self.list_gate: asyncio.Event | None = None
+        self.fail_next_list_codes: list[str] = []
+        self.fail_next_get_codes: list[str] = []
 
     async def create_session(self, project_name: str, session_id: str) -> str:
         self.create_calls += 1
@@ -70,6 +76,9 @@ class FakeRepository:
 
     async def get_session(self, session_id: str) -> dict[str, Any] | None:
         self.get_calls += 1
+        if self.fail_next_get_codes:
+            code = self.fail_next_get_codes.pop(0)
+            raise APIError({"code": code, "message": "injected"})
         row = self.rows.get(session_id)
         if row is None:
             return None
@@ -116,12 +125,19 @@ class FakeRepository:
 
     async def list_cards(self, workspace_id: str) -> list[dict[str, Any]]:
         """Live cards of a workspace in (order_index, created_at, id) order."""
+        self.list_calls += 1
+        if self.fail_next_list_codes:
+            code = self.fail_next_list_codes.pop(0)
+            raise APIError({"code": code, "message": "injected"})
         rows = [
             dict(c)
             for c in self.cards.values()
             if c["workspace_id"] == workspace_id and c["deleted_at"] is None
         ]
-        return sorted(rows, key=lambda c: (c["order_index"], c["created_at"], c["id"]))
+        snapshot = sorted(rows, key=lambda c: (c["order_index"], c["created_at"], c["id"]))
+        if self.list_gate is not None:
+            await self.list_gate.wait()  # rows were computed first: a held read goes stale
+        return snapshot
 
     async def max_order_index(self, quadrant_id: str) -> float | None:
         values = [
@@ -179,6 +195,11 @@ def seed_card(
     }
     repo.cards[row["id"]] = row
     return dict(row)
+
+
+def soft_delete_card(repo: FakeRepository, card_id: str) -> None:
+    """Set ``deleted_at`` on a stored card without any service call or event."""
+    repo.cards[card_id]["deleted_at"] = datetime.now(UTC).isoformat()
 
 
 def card_event(
