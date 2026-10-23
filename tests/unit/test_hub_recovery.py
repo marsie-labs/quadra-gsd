@@ -285,3 +285,88 @@ async def test_reconnecting_state_is_degraded_on_healthz():
     assert body["realtime"]["state"] == "reconnecting"
     assert set(body["realtime"]) == {"state", "stage", "latency_ms", "error"}
     assert set(hub.status()) == {"state", "stage", "latency_ms", "error"}
+
+
+# --- Task 2: a socket that closes silently is noticed by the supervisor ---
+
+
+def _live_supervisors() -> list[asyncio.Task]:
+    return [
+        t for t in asyncio.all_tasks() if t.get_name() == "realtime-supervisor" and not t.done()
+    ]
+
+
+def test_listen_task_attribute_exists():
+    """The supervisor reads the private realtime 2.33 ``_listen_task``; an upgrade must not hide it."""
+    from realtime import AsyncRealtimeClient
+
+    client = AsyncRealtimeClient("https://example.supabase.co/realtime/v1", token="x")
+    assert hasattr(client, "_listen_task")
+
+
+async def test_closed_socket_triggers_recovery(rig):
+    hub = rig.hub
+    rig.listener("a")
+    await _verified_rig(rig)
+
+    rig.clients[0]._listen_task.set_result(None)  # a normal close ends the listen task silently
+    await _until(lambda: hub._recovery_task is not None)
+    assert hub.state == "reconnecting"
+    await hub._recovery_task
+
+    assert rig.events == ["start", "verify", "resync:a"]
+    assert hub.state == "verified"
+
+
+async def test_library_reconnect_does_not_rebuild(rig):
+    hub = rig.hub
+    await _verified_rig(rig)
+    rt = rig.clients[0]
+    old = rt._listen_task
+    rt._listen_task = asyncio.get_running_loop().create_future()  # realtime-py reconnected itself
+    new = rt._listen_task
+
+    old.set_result(None)
+    for _ in range(20):
+        await asyncio.sleep(0)
+
+    assert hub._recovery_task is None
+    assert hub.state == "verified"
+    assert not hub._supervisor_task.done()  # still watching, now the new task
+
+    new.set_result(None)  # the new socket dies too: now it is a real loss
+    await _until(lambda: hub._recovery_task is not None)
+    await hub._recovery_task
+    assert hub.state == "verified"
+
+
+async def test_supervisor_started_after_verified_startup_and_recovery(rig):
+    hub = rig.hub
+    await _verified_rig(rig)
+    assert len(_live_supervisors()) == 1
+    first = hub._supervisor_task
+
+    hub._on_channel_state(CHANNEL_ERROR, None)
+    await hub._recovery_task
+    for _ in range(5):
+        await asyncio.sleep(0)
+
+    assert hub._supervisor_task is not first
+    assert first.done()
+    assert len(_live_supervisors()) == 1
+
+
+async def test_stop_ends_supervisor(rig):
+    hub = rig.hub
+    await _verified_rig(rig)
+    supervisor = hub._supervisor_task
+    rt = rig.clients[0]
+
+    await hub.stop()
+    assert supervisor.done()
+
+    rt._listen_task.set_result(None)
+    for _ in range(20):
+        await asyncio.sleep(0)
+    assert hub._recovery_task is None
+    assert rig.events == []
