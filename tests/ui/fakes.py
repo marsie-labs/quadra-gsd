@@ -180,6 +180,36 @@ class FakeRepository:
         self.cards[card_id] = self._touch(row, {"deleted_at": datetime.now(UTC).isoformat()})
         return dict(self.cards[card_id])
 
+    async def move_card(
+        self, *, workspace_id: str, card_id: str, quadrant_id: str, order_index: float
+    ) -> dict[str, Any] | None:
+        """Move a live card of this workspace to ``quadrant_id`` at ``order_index``.
+
+        Like the real UPDATE: no matching live card gives None before any constraint is looked
+        at; otherwise the composite FK (quadrant_id, workspace_id) rejects a quadrant that is not
+        one of this workspace's with 23503 and the row stays as it was.
+        """
+        self.update_calls += 1
+        if self.update_gate is not None:
+            await self.update_gate.wait()
+        if self.fail_next_update_codes:
+            code = self.fail_next_update_codes.pop(0)
+            raise APIError({"code": code, "message": "injected"})
+        row = self.cards.get(card_id)
+        if row is None or row["workspace_id"] != workspace_id or row["deleted_at"] is not None:
+            return None
+        owned = any(
+            workspace["id"] == workspace_id
+            and any(q["id"] == quadrant_id for q in workspace["quadrants"])
+            for workspace in self.rows.values()
+        )
+        if not owned:
+            raise APIError({"code": "23503", "message": "foreign key violation"})
+        self.cards[card_id] = self._touch(
+            row, {"quadrant_id": quadrant_id, "order_index": order_index}
+        )
+        return dict(self.cards[card_id])
+
     async def list_cards(self, workspace_id: str) -> list[dict[str, Any]]:
         """Live cards of a workspace in (order_index, created_at, id) order."""
         self.list_calls += 1
