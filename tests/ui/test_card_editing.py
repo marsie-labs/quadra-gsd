@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
-from nicegui import ui
+from nicegui import events, ui
 from nicegui.testing.user_notify import UserNotify
 from postgrest.exceptions import APIError
 
@@ -456,3 +456,251 @@ async def test_edited_markup_is_shown_literally(user):
     assert isinstance(text, ui.label)
     assert text.text == "<b>x</b>"
     assert repo.cards[row["id"]]["text"] == "<b>x</b>"
+
+
+# ---------------------------------------------------------------- the card menu and editor rules
+
+DIALOG_TITLE = "Enter your name to continue"
+
+
+def _menu_button(browser, card_id: str) -> ui.button:
+    with browser.scope(marker=f"card-{card_id}"):
+        return next(iter(browser.find(marker="card-menu").elements))
+
+
+def _menu_edit(browser, card_id: str) -> None:
+    """Choose Edit in the card's menu (menu items are found while the menu is closed)."""
+    with browser.scope(marker=f"card-{card_id}"):
+        browser.find(marker="card-action-edit").click()
+
+
+def _listener_handlers(element: ui.element, event_type: str) -> list:
+    return [
+        listener.handler
+        for listener in element._event_listeners.values()
+        if listener.type == event_type
+    ]
+
+
+def _fire(browser, element: ui.element, handler) -> None:
+    """Run a captured listener handler, as an event that was already queued would."""
+    with browser.client:
+        events.handle_event(
+            handler, events.GenericEventArguments(sender=element, client=browser.client, args={})
+        )
+
+
+async def test_every_card_has_one_enabled_menu_button_with_a_distinct_accessible_name(user):
+    repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
+    first = seed_card(repo, SEEDED_ID_A, "IS", "alpha", order_index=1024.0)
+    second = seed_card(repo, SEEDED_ID_A, "IS", "beta", order_index=2048.0)
+    long_text = "x" * 60
+    third = seed_card(repo, SEEDED_ID_A, "DOES", long_text)
+    await user.open(PATH_A)
+
+    assert len(user.find(marker="card-menu").elements) == 3
+    for card_id in (first["id"], second["id"], third["id"]):
+        with user.scope(marker=f"card-{card_id}"):
+            assert len(user.find(marker="card-menu").elements) == 1
+        assert _menu_button(user, card_id).enabled
+        assert _menu_button(user, card_id).props["icon"] == "more_vert"
+    assert _menu_button(user, first["id"]).props["aria-label"] == "Card actions: alpha"
+    assert _menu_button(user, second["id"]).props["aria-label"] == "Card actions: beta"
+    assert _menu_button(user, third["id"]).props["aria-label"] == "Card actions: " + "x" * 40
+
+    _open_editor(user, first["id"])
+    _type_and_enter(user, "alpha edited")
+    await _wait_for(lambda: repo.cards[first["id"]]["text"] == "alpha edited")
+    await _wait_for(
+        lambda: _menu_button(user, first["id"]).props["aria-label"] == "Card actions: alpha edited"
+    )
+
+
+async def test_menu_edit_item_opens_the_editor_with_the_card_text(user):
+    repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
+    row = seed_card(repo, SEEDED_ID_A, "IS", "old text")
+    await user.open(PATH_A)
+
+    _menu_edit(user, row["id"])
+
+    assert _editor(user).value == "old text"
+    with user.scope(marker=f"card-{row['id']}"):
+        text = next(iter(user.find(marker="card-text").elements))
+    assert not text.visible
+
+
+async def test_editor_registers_one_exact_enter_listener_plus_esc_and_blur(user):
+    repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
+    row = seed_card(repo, SEEDED_ID_A, "IS", "old text")
+    await user.open(PATH_A)
+
+    _open_editor(user, row["id"])
+    types = [listener.type for listener in _editor(user)._event_listeners.values()]
+
+    assert [t for t in types if t.startswith("keydown.enter")] == [ENTER]
+    assert "keydown.enter" not in types
+    assert "keydown.esc" in types
+    assert "blur" in types
+
+
+async def test_multi_line_text_is_stored_with_its_line_break_and_shown_on_two_lines(user):
+    repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
+    row = seed_card(repo, SEEDED_ID_A, "IS", "old text")
+    await user.open(PATH_A)
+
+    _open_editor(user, row["id"])
+    _type_and_enter(user, "line one\nline two")
+
+    await _wait_for(lambda: repo.update_calls == 1)
+    assert repo.cards[row["id"]]["text"] == "line one\nline two"
+    await user.should_not_see(marker="card-editor")
+    with user.scope(marker=f"card-{row['id']}"):
+        text = next(iter(user.find(marker="card-text").elements))
+    assert text.text == "line one\nline two"
+    assert "whitespace-pre-wrap" in text.classes
+
+
+async def test_blur_saves_changed_text(user):
+    repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
+    row = seed_card(repo, SEEDED_ID_A, "IS", "old text")
+    await user.open(PATH_A)
+
+    _open_editor(user, row["id"])
+    user.find(marker="card-editor").clear().type("clicked away")
+    user.find(marker="card-editor").trigger("blur")
+
+    await _wait_for(lambda: repo.update_calls == 1)
+    await _wait_for(lambda: _card_texts(user, "IS") == ["clicked away"])
+    assert repo.cards[row["id"]]["text"] == "clicked away"
+    await user.should_not_see(marker="card-editor")
+
+
+async def test_enter_then_a_queued_blur_writes_once(user):
+    repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
+    row = seed_card(repo, SEEDED_ID_A, "IS", "old text")
+    await user.open(PATH_A)
+
+    _open_editor(user, row["id"])
+    editor = _editor(user)
+    (blur,) = _listener_handlers(editor, "blur")
+    _type_and_enter(user, "new text")
+    await _wait_for(lambda: repo.update_calls == 1)
+    await user.should_not_see(marker="card-editor")
+
+    _fire(user, editor, blur)  # the blur that was already queued behind Enter
+    await asyncio.sleep(0.1)
+
+    assert repo.update_calls == 1
+    assert repo.cards[row["id"]]["text"] == "new text"
+
+
+async def test_esc_then_a_queued_blur_writes_nothing(user):
+    repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
+    row = seed_card(repo, SEEDED_ID_A, "IS", "old text")
+    await user.open(PATH_A)
+
+    _open_editor(user, row["id"])
+    editor = _editor(user)
+    (blur,) = _listener_handlers(editor, "blur")
+    user.find(marker="card-editor").clear().type("never saved")
+    user.find(marker="card-editor").trigger("keydown.esc")
+    await user.should_not_see(marker="card-editor")
+
+    _fire(user, editor, blur)
+    await asyncio.sleep(0.1)
+
+    assert repo.update_calls == 0
+    assert _card_texts(user, "IS") == ["old text"]
+
+
+async def test_esc_closes_the_editor_and_shows_the_original_text(user):
+    repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
+    row = seed_card(repo, SEEDED_ID_A, "IS", "old text")
+    await user.open(PATH_A)
+
+    _open_editor(user, row["id"])
+    user.find(marker="card-editor").clear().type("typed then dropped")
+    user.find(marker="card-editor").trigger("keydown.esc")
+
+    await user.should_not_see(marker="card-editor")
+    with user.scope(marker=f"card-{row['id']}"):
+        text = next(iter(user.find(marker="card-text").elements))
+    assert text.visible
+    assert text.text == "old text"
+    assert repo.update_calls == 0
+    assert "(edited)" not in _meta(user, row["id"])
+
+
+async def test_unchanged_text_padded_with_spaces_writes_nothing_and_closes_the_editor(user):
+    repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
+    row = seed_card(repo, SEEDED_ID_A, "IS", "old text")
+    await user.open(PATH_A)
+
+    _open_editor(user, row["id"])
+    _type_and_enter(user, "  old text  ")
+    await user.should_not_see(marker="card-editor")
+    await asyncio.sleep(0.1)
+
+    assert repo.update_calls == 0
+    assert _card_texts(user, "IS") == ["old text"]
+    assert "(edited)" not in _meta(user, row["id"])
+
+
+async def test_blur_with_empty_text_keeps_the_editor_open_with_the_error_until_esc(user):
+    repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
+    row = seed_card(repo, SEEDED_ID_A, "IS", "old text")
+    await user.open(PATH_A)
+
+    _open_editor(user, row["id"])
+    user.find(marker="card-editor").clear()
+    user.find(marker="card-editor").trigger("blur")
+    await asyncio.sleep(0.1)
+
+    assert len(user.find(marker="card-editor").elements) == 1
+    assert _editor(user).error == CARD_TEXT_ERROR
+    assert repo.update_calls == 0
+
+    user.find(marker="card-editor").trigger("keydown.esc")
+    await user.should_not_see(marker="card-editor")
+    assert _card_texts(user, "IS") == ["old text"]
+    assert repo.update_calls == 0
+
+
+async def test_double_enter_in_flight_writes_once_and_guards_the_card(user):
+    repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
+    row = seed_card(repo, SEEDED_ID_A, "IS", "old text")
+    await user.open(PATH_A)
+    repo.update_gate = asyncio.Event()
+
+    _open_editor(user, row["id"])
+    user.find(marker="card-editor").clear().type("new text")
+    user.find(marker="card-editor").trigger(ENTER)
+    user.find(marker="card-editor").trigger(ENTER)
+    await _wait_for(lambda: repo.update_calls == 1)
+    await asyncio.sleep(0.1)
+
+    assert repo.update_calls == 1
+    assert not _menu_button(user, row["id"]).enabled
+    _open_editor(user, row["id"])  # clicking the text while the write is in flight
+    assert len(user.find(marker="card-editor").elements) == 0
+
+    repo.update_gate.set()
+    await _wait_for(lambda: repo.cards[row["id"]]["text"] == "new text")
+    await _wait_for(lambda: _menu_button(user, row["id"]).enabled)
+    assert repo.update_calls == 1
+
+
+async def test_anyone_edits_without_a_name_and_the_author_stays(user):
+    repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
+    row = seed_card(repo, SEEDED_ID_A, "IS", "old text", author="Ann")
+    await user.open(PATH_A)
+    await user.should_see(marker="name-banner")
+
+    _menu_edit(user, row["id"])
+    _type_and_enter(user, "edited by a stranger")
+
+    await _wait_for(lambda: repo.cards[row["id"]]["text"] == "edited by a stranger")
+    await user.should_not_see(DIALOG_TITLE)
+    await user.should_see(marker="name-banner")
+    assert repo.cards[row["id"]]["author"] == "Ann"
+    assert repo.update_calls == 1
