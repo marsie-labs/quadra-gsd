@@ -29,7 +29,13 @@ from nicegui import background_tasks, ui
 
 from app.deps import get_services
 from app.models import QUADRANT_LABELS, CardView, QuadrantView, SessionView, card_sort_key
-from app.services.sessions import CARD_TEXT_ERROR, CardGone, InvalidCardText, validate_card_text
+from app.services.sessions import (
+    CARD_TEXT_ERROR,
+    CardGone,
+    InvalidCardText,
+    next_order_index,
+    validate_card_text,
+)
 from app.ui.identity import ensure_display_name
 
 logger = logging.getLogger(__name__)
@@ -38,6 +44,7 @@ EDIT_FAILED = "Could not save the card. Please try again."
 CARD_GONE = "This card was deleted."
 CARD_DELETED = "Card deleted"
 DELETE_FAILED = "Could not delete the card. Please try again."
+MOVE_FAILED = "Could not move the card. Please try again."
 MENU_LABEL_CODE_POINTS = 40
 
 
@@ -75,6 +82,7 @@ class _CardWidgets:
     quadrant_id: str
     menu_button: ui.button
     menu: ui.menu
+    move_items: dict[str, ui.element]  # quadrant kind -> its "Move to" item
 
 
 @dataclass(slots=True)
@@ -89,6 +97,7 @@ class CanvasView:
     def __init__(self, session: SessionView, on_name_saved: Callable[[str], None]) -> None:
         self.workspace_id = session.workspace_id
         self._session = session
+        self._kinds = {quadrant.id: quadrant.kind for quadrant in session.quadrants}
         self._on_name_saved = on_name_saved
         self._cards: dict[str, CardView] = {}
         self._widgets: dict[str, _CardWidgets] = {}
@@ -245,7 +254,7 @@ class CanvasView:
                     with (
                         ui.button(icon="more_vert").props("flat round dense").mark("card-menu")
                     ) as menu_button:
-                        menu = self._build_menu(card_id)
+                        menu, move_items = self._build_menu(card_id)
                     # Item assignment, never the props string parser: the text is user input.
                     menu_button.props["aria-label"] = menu_label(row.text)
         return _CardWidgets(
@@ -256,20 +265,41 @@ class CanvasView:
             quadrant_id=row.quadrant_id,
             menu_button=menu_button,
             menu=menu,
+            move_items=move_items,
         )
 
-    def _build_menu(self, card_id: str) -> ui.menu:
-        """The card's actions, in the order D-07 fixes. Must be called inside the menu button."""
+    def _build_menu(self, card_id: str) -> tuple[ui.menu, dict[str, ui.element]]:
+        """The card's actions, in the order D-07 fixes. Must be called inside the menu button.
+
+        Move to is a submenu so the top-level menu keeps its shape; its items are returned by
+        quadrant kind so ``_render`` can hide the one for the card's current quadrant.
+        """
+        move_items: dict[str, ui.element] = {}
         # no-refocus: closing the menu must not give focus back to the button while the editor
         # that Edit just opened is taking it.
         with ui.menu().props("no-refocus") as menu:
             ui.menu_item(
                 "Edit", on_click=lambda _, card_id=card_id: self._start_edit(card_id)
             ).mark("card-action-edit")
+            # auto_close=False: opening the submenu must not close the menu it hangs from. A menu
+            # item closes only its nearest menu, so a chosen quadrant closes the top menu itself.
+            with ui.menu_item("Move to", auto_close=False).mark("card-action-move"):
+                with ui.item_section().props("side"):
+                    ui.icon("keyboard_arrow_right")
+                with ui.menu().props('anchor="top end" self="top start"'):
+                    for quadrant in self._session.quadrants:
+
+                        async def choose(_, card_id=card_id, quadrant_id=quadrant.id) -> None:
+                            menu.close()
+                            await self._move_card(card_id, quadrant_id)
+
+                        move_items[quadrant.kind] = ui.menu_item(
+                            QUADRANT_LABELS[quadrant.kind], on_click=choose
+                        ).mark(f"card-action-move-{quadrant.kind}")
             ui.menu_item(
                 "Delete", on_click=lambda _, card_id=card_id: self._delete_card(card_id)
             ).mark("card-action-delete")
-        return menu
+        return menu, move_items
 
     def _render(self, card_id: str) -> None:
         """Make the page match ``_shown(card_id)``: create, update in place, reposition or drop."""
@@ -312,6 +342,9 @@ class CanvasView:
         siblings = list(container.default_slot.children)
         if index >= len(siblings) or siblings[index] is not widgets.card:
             widgets.card.move(target_container=container, target_index=index)
+        current_kind = self._kinds.get(shown.quadrant_id)
+        for kind, item in widgets.move_items.items():
+            item.set_visibility(kind != current_kind)  # only the other quadrants are offered
         old_quadrant_id = widgets.quadrant_id
         widgets.quadrant_id = shown.quadrant_id
         self._refresh_hint(old_quadrant_id)
@@ -388,6 +421,40 @@ class CanvasView:
             lambda: get_services().sessions.delete_card(self.workspace_id, card_id),
             DELETE_FAILED,
             "delete_card",
+        )
+
+    async def _move_card(self, card_id: str, quadrant_id: str) -> None:
+        """Move to the end of ``quadrant_id`` from the card's menu (D-09); no name needed (D-05).
+
+        The card shows at the end of the target before the write returns, at the position the
+        service will most likely store; the confirmed row replaces it (``_write``)."""
+        shown = self._shown(card_id)
+        if (
+            shown is None
+            or card_id in self._busy
+            or shown.quadrant_id == quadrant_id
+            or quadrant_id not in self._lists
+        ):
+            return
+        target_orders = [
+            row.order_index
+            for other_id in self._widgets
+            if other_id != card_id
+            and (row := self._shown(other_id)) is not None
+            and row.quadrant_id == quadrant_id
+        ]
+        optimistic = shown.model_copy(
+            update={
+                "quadrant_id": quadrant_id,
+                "order_index": next_order_index(max(target_orders, default=None)),
+            }
+        )
+        await self._write(
+            card_id,
+            optimistic,
+            lambda: get_services().sessions.move_card(self.workspace_id, card_id, quadrant_id),
+            MOVE_FAILED,
+            "move_card",
         )
 
     def _start_edit(self, card_id: str) -> None:

@@ -119,6 +119,18 @@ class Repository:
             workspace_id, card_id, {"deleted_at": datetime.now(UTC).isoformat()}
         )
 
+    async def move_card(
+        self, *, workspace_id: str, card_id: str, quadrant_id: str, order_index: float
+    ) -> dict[str, Any] | None:
+        """Move a card to ``quadrant_id`` at ``order_index``; only those two columns change.
+
+        workspace_id is never written, so the composite foreign key (quadrant_id, workspace_id)
+        rejects a quadrant of another session with SQLSTATE 23503, which propagates as APIError.
+        """
+        return await self._update_live_card(
+            workspace_id, card_id, {"quadrant_id": quadrant_id, "order_index": order_index}
+        )
+
     async def max_order_index(self, quadrant_id: str) -> float | None:
         """Highest order_index among the quadrant's live cards, or None when it has none."""
         resp = await (

@@ -155,6 +155,24 @@ class SessionService:
             return None
         return CardView.model_validate(row)
 
+    async def move_card(self, workspace_id: str, card_id: str, quadrant_id: str) -> CardView:
+        """Move a card to the end of ``quadrant_id`` (D-09), the way ``add_card`` places a new one.
+
+        Raises CardGone when the card is missing, deleted or in another session; a quadrant of
+        another session is refused by the database (APIError 23503). No author: anyone may move
+        any card (D-05), and the card's author and text are untouched.
+        """
+        current_max = await self._repository.max_order_index(quadrant_id)
+        row = await self._repository.move_card(
+            workspace_id=workspace_id,
+            card_id=card_id,
+            quadrant_id=quadrant_id,
+            order_index=next_order_index(current_max),
+        )
+        if row is None:
+            raise CardGone(card_id)
+        return CardView.model_validate(row)
+
     async def list_cards(self, workspace_id: str) -> list[CardView]:
         rows = await self._repository.list_cards(workspace_id)
         return [CardView.model_validate(r) for r in rows]
