@@ -42,6 +42,7 @@ class CardView(BaseModel):
     order_index: float
     created_at: datetime
     updated_at: datetime
+    text_updated_at: datetime | None = None  # set by the cards_touch trigger on text changes
     deleted_at: datetime | None = None
 
 

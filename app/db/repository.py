@@ -7,7 +7,8 @@ from app.settings import Settings
 from supabase import AsyncClient, acreate_client
 
 CARD_COLUMNS = (
-    "id, workspace_id, quadrant_id, text, order_index, author, created_at, updated_at, deleted_at"
+    "id, workspace_id, quadrant_id, text, order_index, author, created_at, updated_at, "
+    "text_updated_at, deleted_at"
 )
 
 
@@ -80,6 +81,33 @@ class Repository:
             .execute()
         )
         return resp.data[0]
+
+    async def _update_live_card(
+        self, workspace_id: str, card_id: str, values: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        """Update one live card of one workspace; the full row, or None when nothing matched.
+
+        Scoped by id, workspace and ``deleted_at is null``, so a card of another session or an
+        already deleted card matches no row. PostgREST returns the updated row by default.
+        """
+        resp = await (
+            self._client.table("cards")
+            .update(values)
+            .eq("id", card_id)
+            .eq("workspace_id", workspace_id)
+            .is_("deleted_at", "null")
+            .execute()
+        )
+        if not resp.data:
+            return None
+        return resp.data[0]
+
+    async def update_card_text(
+        self, *, workspace_id: str, card_id: str, text: str
+    ) -> dict[str, Any] | None:
+        """Change only a card's text. updated_at and text_updated_at belong to the cards_touch
+        trigger and the author is never rewritten (D-05)."""
+        return await self._update_live_card(workspace_id, card_id, {"text": text})
 
     async def max_order_index(self, quadrant_id: str) -> float | None:
         """Highest order_index among the quadrant's live cards, or None when it has none."""

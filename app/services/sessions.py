@@ -53,6 +53,10 @@ class InvalidCardAuthor(ValueError):
     """The card author is empty after trimming or longer than MAX_AUTHOR."""
 
 
+class CardGone(LookupError):
+    """The card does not exist in this session or is already deleted."""
+
+
 def validate_card_text(raw: str | None) -> str | None:
     """Return the trimmed card text, or None when invalid.
 
@@ -128,6 +132,19 @@ class SessionService:
             author=clean_author,
             order_index=next_order_index(current_max),
         )
+        return CardView.model_validate(row)
+
+    async def edit_card(self, workspace_id: str, card_id: str, text: str) -> CardView:
+        """Change a card's text. Validates before any repository call; raises CardGone when the
+        card is missing, deleted or in another session. No author: anyone may edit (D-05)."""
+        clean_text = validate_card_text(text)
+        if clean_text is None:
+            raise InvalidCardText(CARD_TEXT_ERROR)
+        row = await self._repository.update_card_text(
+            workspace_id=workspace_id, card_id=card_id, text=clean_text
+        )
+        if row is None:
+            raise CardGone(card_id)
         return CardView.model_validate(row)
 
     async def list_cards(self, workspace_id: str) -> list[CardView]:
