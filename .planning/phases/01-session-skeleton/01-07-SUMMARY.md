@@ -193,6 +193,8 @@ None beyond the plan: the flag is a closure local (per tab), success holds the l
 
 **Hosted integration tests NOT run (acceptance criteria unmet in this worktree).** The plan requires `tests/integration/test_skeleton_e2e.py::test_create_from_home_lands_on_canvas` and `tests/integration/test_create_session.py::test_same_name_twice_gives_two_sessions` to report "1 passed, 0 skipped". The worktree has no `.env` (gitignored), and the sandbox secret-read guard blocked copying `/Users/marco/src/marsie/gsd/quadra-gsd/.env` into the worktree, so the e2e test reported `1 skipped` (".env with SUPABASE_URL, SUPABASE_SECRET_KEY, STORAGE_SECRET required"). I did not work around the guard. The unit-tier same-name-twice test passes (1 passed). The orchestrator should run the two integration tests from the main checkout after merging this branch; this change touches no Supabase surface, only the page and fakes, so a regression there is unlikely but is unverified.
 
+**Orchestrator post-merge resolution (2026-10-23):** after merging this branch (`6c9fced`), the orchestrator ran both tests from the main checkout with its `.env`: `uv run pytest -m integration "tests/integration/test_skeleton_e2e.py::test_create_from_home_lands_on_canvas" "tests/integration/test_create_session.py::test_same_name_twice_gives_two_sessions" -q -rs` → `2 passed, 4 warnings` (0 skipped; warnings are supabase-py `timeout`/`verify` DeprecationWarnings). The post-merge quick suite reported `96 passed, 13 deselected`. The acceptance criteria are now met.
+
 ## User Setup Required
 
 None - no external service configuration required.

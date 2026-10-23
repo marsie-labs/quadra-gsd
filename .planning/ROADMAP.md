@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. Opening a link with an unknown `session_id` shows a not-found page
   5. Developer can follow the README to set env vars, apply migrations to the hosted Supabase project, and start the app (single worker); a startup check confirms DB change events reach the Python server
 
-**Plans:** 6/7 plans executed
+**Plans:** 7/7 plans executed
 
 Plans:
 **Wave 1**
@@ -53,7 +53,7 @@ Plans:
 - [x] 01-06-PLAN.md — Display-name identity: inline banner, per-browser memory, ensure_display_name() gate, author constraint, second no-login browser
 
 **Wave 6** *(gap closure; blocked on Wave 5 completion)*
-- [ ] 01-07-PLAN.md — Double-submit guard: per-page re-entrancy flag on home-page create (double Enter / double click make one session), locked until navigation, released on failure (closes VERIFICATION gap / REVIEW WR-01)
+- [x] 01-07-PLAN.md — Double-submit guard: per-page re-entrancy flag on home-page create (double Enter / double click make one session), locked until navigation, released on failure (closes VERIFICATION gap / REVIEW WR-01)
 
 **UI hint**: yes
 
@@ -125,7 +125,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Session Skeleton | 6/7 | In Progress | - |
+| 1. Session Skeleton | 7/7 | In Progress | - |
 | 2. Live Shared Canvas | 0/TBD | Not started | - |
 | 3. Card Editing | 0/TBD | Not started | - |
 | 4. Session Close & Lock | 0/TBD | Not started | - |
