@@ -54,12 +54,16 @@ The migrations, applied in order:
 |---------|------|--------------|
 | `20261022000000` | `supabase/migrations/20261022000000_init_schema.sql` | Sessions, quadrants, cards, the probe table, RLS and the Realtime publication. |
 | `20261023000000` | `supabase/migrations/20261023000000_author_nonblank.sql` | Database checks that a card's author (and a closing name) is not blank and at most 40 characters. |
+| `20261023120000` | `supabase/migrations/20261023120000_card_edit_tracking.sql` | Cards remember when their text was last edited (`text_updated_at`), and every card update gets a newer `updated_at` from a trigger. |
+
+The app selects `text_updated_at`, so push migrations before starting a newer app version, or canvas pages answer "Temporarily unavailable".
 
 Fallback when the CLI cannot reach the project: paste each migration file, in version order, into the Dashboard SQL editor and run it, then record each one as applied so the CLI stays in sync:
 
 ```bash
 supabase migration repair --status applied 20261022000000 --linked
 supabase migration repair --status applied 20261023000000 --linked
+supabase migration repair --status applied 20261023120000 --linked
 ```
 
 ## Run
