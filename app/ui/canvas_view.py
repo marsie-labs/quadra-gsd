@@ -204,10 +204,15 @@ class CanvasView:
         self._remove(card_id)
 
     def _remove(self, card_id: str) -> None:
+        """Drop a card. An editor open on it closes with it and its participant is told (D-04):
+        there is nothing left to save the draft into. Covers soft deletes, DELETE events, moves
+        to another session and cards missing from a snapshot."""
+        had_editor = self._editing.pop(card_id, None) is not None
         self._cards.pop(card_id, None)
         self._optimistic.pop(card_id, None)
-        self._editing.pop(card_id, None)
         self._render(card_id)
+        if had_editor and not self._gone():
+            self._notify(CARD_GONE)  # events arrive outside any handler: use the root context
 
     def _shown(self, card_id: str) -> CardView | None:
         """The row the page should show: the optimistic row if any, else the server row."""

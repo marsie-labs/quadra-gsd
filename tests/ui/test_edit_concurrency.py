@@ -41,6 +41,15 @@ class _TypedNotify(UserNotify):
         super().__call__(message, **kwargs)
 
 
+def _typed_notify(user) -> _TypedNotify:
+    """Install a typed notify. The user fixture re-points ``ui.notify`` at its notifier on every
+    attribute access, so one access (``user.client``) makes the swap effective right away."""
+    notifications = _TypedNotify()
+    user.notify = notifications
+    assert user.client is not None
+    return notifications
+
+
 def _card_element(browser, card_id: str) -> ui.card:
     return next(iter(browser.find(marker=f"card-{card_id}").elements))
 
@@ -106,6 +115,10 @@ async def _draft_open(user, base: str = "base", draft: str = "mine"):
         user.find(marker="card-text").click()
     user.find(marker="card-editor").clear().type(draft)
     return repo, row, _editor(user)
+
+
+def test_the_mid_edit_delete_warning_text_is_pinned():
+    assert CARD_GONE == "This card was deleted."
 
 
 # ---------------------------------------------------------------- a remote edit meanwhile
@@ -207,7 +220,7 @@ async def test_remote_move_keeps_the_editor_and_draft_in_the_new_column_and_ente
 
 async def test_soft_delete_event_closes_the_editor_and_warns(user):
     repo, row, _ = await _draft_open(user)
-    user.notify = notifications = _TypedNotify()
+    notifications = _typed_notify(user)
 
     get_services().hub._on_card(
         card_event(
@@ -228,7 +241,7 @@ async def test_soft_delete_event_closes_the_editor_and_warns(user):
 
 async def test_delete_event_with_only_the_id_closes_the_editor_and_warns(user):
     _, row, _ = await _draft_open(user)
-    user.notify = notifications = _TypedNotify()
+    notifications = _typed_notify(user)
 
     get_services().hub._on_card(card_event({}, "DELETE", old={"id": row["id"]}))
 
@@ -254,7 +267,7 @@ async def test_deleting_a_card_nobody_is_editing_shows_no_warning(user):
     repo = install_fake_services({SEEDED_ID_A: SEEDED_NAME_A})
     row = seed_card(repo, SEEDED_ID_A, "IS", "plain")
     await user.open(PATH_A)
-    user.notify = notifications = _TypedNotify()
+    notifications = _typed_notify(user)
 
     get_services().hub._on_card(card_event({}, "DELETE", old={"id": row["id"]}))
 
