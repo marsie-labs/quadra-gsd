@@ -29,7 +29,8 @@ class FakeRepository:
     """Mimics ``Repository`` including the DB CHECK constraints and unique session_id.
 
     ``create_gate`` (an unset ``asyncio.Event``) holds a create in flight for the
-    double-trigger tests.
+    double-trigger tests; ``insert_gate`` does the same for a card insert. The
+    ``fail_next_*_codes`` lists make the next write raise an ``APIError`` with that code.
     """
 
     def __init__(self) -> None:
@@ -40,6 +41,8 @@ class FakeRepository:
         self.create_gate: asyncio.Event | None = None
         self.cards: dict[str, dict[str, Any]] = {}
         self.insert_calls = 0
+        self.insert_gate: asyncio.Event | None = None
+        self.fail_next_insert_codes: list[str] = []
 
     async def create_session(self, project_name: str, session_id: str) -> str:
         self.create_calls += 1
@@ -83,6 +86,11 @@ class FakeRepository:
     ) -> dict[str, Any]:
         """Mirror the cards constraints: composite FK, text 1-500 (btrim spaces), author 1-40."""
         self.insert_calls += 1
+        if self.insert_gate is not None:
+            await self.insert_gate.wait()
+        if self.fail_next_insert_codes:
+            code = self.fail_next_insert_codes.pop(0)
+            raise APIError({"code": code, "message": "injected"})
         owned = any(
             row["id"] == workspace_id and any(q["id"] == quadrant_id for q in row["quadrants"])
             for row in self.rows.values()
